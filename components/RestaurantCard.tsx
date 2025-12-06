@@ -1,0 +1,171 @@
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Star, Clock, MapPin } from 'lucide-react-native';
+import { Vendor } from '@/types/database';
+
+interface RestaurantCardProps {
+  restaurant: Vendor;
+  onPress: () => void;
+}
+
+export default function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      {restaurant.logo_url ? (
+        <Image source={{ uri: restaurant.logo_url }} style={styles.logo} />
+      ) : (
+        <View style={[styles.logo, styles.logoPlaceholder]}>
+          <Text style={styles.logoText}>{restaurant.business_name[0]}</Text>
+        </View>
+      )}
+
+      <View style={styles.content}>
+        <Text style={styles.name} numberOfLines={1}>
+          {restaurant.business_name}
+        </Text>
+
+        {restaurant.description && (
+          <Text style={styles.description} numberOfLines={2}>
+            {restaurant.description}
+          </Text>
+        )}
+
+        {restaurant.cuisine_types && restaurant.cuisine_types.length > 0 && (
+          <View style={styles.cuisineContainer}>
+            {restaurant.cuisine_types.slice(0, 3).map((cuisine, index) => (
+              <Text key={index} style={styles.cuisineText}>
+                {cuisine}
+                {index < Math.min(restaurant.cuisine_types!.length - 1, 2) ? ' • ' : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.metaContainer}>
+          <View style={styles.metaItem}>
+            <Star size={14} color="#fbbf24" fill="#fbbf24" />
+            <Text style={styles.metaText}>{restaurant.rating.toFixed(1)}</Text>
+          </View>
+
+          {restaurant.average_preparation_time && (
+            <View style={styles.metaItem}>
+              <Clock size={14} color="#64748b" />
+              <Text style={styles.metaText}>{restaurant.average_preparation_time} min</Text>
+            </View>
+          )}
+
+          {restaurant.city && (
+            <View style={styles.metaItem}>
+              <MapPin size={14} color="#64748b" />
+              <Text style={styles.metaText}>{restaurant.city}</Text>
+            </View>
+          )}
+        </View>
+
+        {restaurant.minimum_order && restaurant.minimum_order > 0 && (
+          <Text style={styles.minOrder}>Min. order: ${restaurant.minimum_order.toFixed(2)}</Text>
+        )}
+
+        {!restaurant.is_accepting_orders && (
+          <View style={styles.closedBadge}>
+            <Text style={styles.closedText}>Closed</Text>
+          </View>
+        )}
+
+        {restaurant.is_currently_open === false && restaurant.is_accepting_orders && (
+          <View style={styles.closedBadge}>
+            <Text style={styles.closedText}>Currently Closed</Text>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  logo: {
+    width: '100%',
+    height: 180,
+    backgroundColor: '#f1f5f9',
+  },
+  logoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ff8c00',
+  },
+  logoText: {
+    fontSize: 64,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  content: {
+    padding: 16,
+  },
+  name: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1f2937',
+    marginBottom: 6,
+  },
+  description: {
+    fontSize: 14,
+    color: '#64748b',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  cuisineContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  cuisineText: {
+    fontSize: 13,
+    color: '#ff8c00',
+    fontWeight: '600',
+  },
+  metaContainer: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 8,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  minOrder: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  closedBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#fee2e2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  closedText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#dc2626',
+  },
+});

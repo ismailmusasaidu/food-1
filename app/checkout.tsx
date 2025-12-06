@@ -1,0 +1,1175 @@
+import { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
+import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon } from 'lucide-react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+import { router } from 'expo-router';
+
+interface CartItemWithProduct {
+  id: string;
+  quantity: number;
+  product_id: string;
+  product: {
+    id: string;
+    name: string;
+    price: number;
+    unit: string;
+    vendor_id: string;
+  };
+}
+
+const DELIVERY_FEE = 5.0;
+
+export default function CheckoutScreen() {
+  const { profile } = useAuth();
+  const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
+  const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryName, setDeliveryName] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
+  const [scheduleType, setScheduleType] = useState<'immediate' | 'scheduled'>('immediate');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
+  const [mealTimePreference, setMealTimePreference] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [orderNumber, setOrderNumber] = useState('');
+
+  useEffect(() => {
+    fetchCartItems();
+  }, []);
+
+  const fetchCartItems = async () => {
+    if (!profile) return;
+
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('carts')
+        .select(
+          `
+          id,
+          quantity,
+          product_id,
+          products (
+            id,
+            name,
+            price,
+            unit,
+            vendor_id
+          )
+        `
+        )
+        .eq('user_id', profile.id);
+
+      if (error) throw error;
+
+      const formattedData = (data || []).map((item: any) => ({
+        id: item.id,
+        quantity: item.quantity,
+        product_id: item.product_id,
+        product: item.products,
+      }));
+
+      setCartItems(formattedData);
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+      Alert.alert('Error', 'Failed to load cart items');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateSubtotal = () => {
+    return cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  };
+
+  const calculateTotal = () => {
+    const subtotal = calculateSubtotal();
+    const deliveryFee = deliveryType === 'delivery' ? DELIVERY_FEE : 0;
+    return subtotal + deliveryFee;
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!profile) return;
+
+    if (deliveryType === 'delivery' && !deliveryAddress.trim()) {
+      Alert.alert('Missing Address', 'Please provide a delivery address');
+      return;
+    }
+
+    if (deliveryType === 'delivery' && !deliveryName.trim()) {
+      Alert.alert('Missing Name', 'Please provide a delivery name');
+      return;
+    }
+
+    if (deliveryType === 'delivery' && !deliveryPhone.trim()) {
+      Alert.alert('Missing Phone', 'Please provide a delivery phone number');
+      return;
+    }
+
+    if (scheduleType === 'scheduled' && !scheduledDate.trim()) {
+      Alert.alert('Missing Date', 'Please select a delivery date');
+      return;
+    }
+
+    if (scheduleType === 'scheduled' && !scheduledTime.trim()) {
+      Alert.alert('Missing Time', 'Please select a delivery time');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      Alert.alert('Empty Cart', 'Your cart is empty');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const vendorId = cartItems[0].product.vendor_id;
+      const orderNumber = `ORD-${Date.now()}`;
+      const subtotal = calculateSubtotal();
+      const deliveryFee = deliveryType === 'delivery' ? DELIVERY_FEE : 0;
+      const total = subtotal + deliveryFee;
+
+      let scheduledDeliveryTime = null;
+      if (scheduleType === 'scheduled' && scheduledDate && scheduledTime) {
+        scheduledDeliveryTime = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+      }
+
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: profile.id,
+          vendor_id: vendorId,
+          order_number: orderNumber,
+          subtotal: subtotal,
+          delivery_fee: deliveryFee,
+          total: total,
+          delivery_type: deliveryType,
+          delivery_address: deliveryType === 'delivery' ? `${deliveryName}\n${deliveryPhone}\n${deliveryAddress}` : 'N/A',
+          status: 'pending',
+          is_scheduled: scheduleType === 'scheduled',
+          scheduled_delivery_time: scheduledDeliveryTime,
+          meal_time_preference: mealTimePreference,
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItems = cartItems.map((item) => ({
+        order_id: orderData.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        subtotal: item.product.price * item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) throw itemsError;
+
+      const { error: deleteError } = await supabase
+        .from('carts')
+        .delete()
+        .eq('user_id', profile.id);
+
+      if (deleteError) throw deleteError;
+
+      setOrderNumber(orderNumber);
+      setOrderPlaced(true);
+    } catch (error) {
+      console.error('Error placing order:', error);
+      Alert.alert('Error', 'Failed to place order. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#ff8c00" />
+      </View>
+    );
+  }
+
+  if (orderPlaced) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Order Placed!</Text>
+        </View>
+
+        <ScrollView style={styles.content} contentContainerStyle={styles.successContent}>
+          <View style={styles.successIconContainer}>
+            <View style={styles.successIconCircle}>
+              <CheckCircle size={64} color="#ff8c00" strokeWidth={2} />
+            </View>
+          </View>
+
+          <Text style={styles.successTitle}>Order Confirmed!</Text>
+          <Text style={styles.successMessage}>
+            Your order has been placed successfully
+          </Text>
+
+          <View style={styles.orderDetailsCard}>
+            <Text style={styles.orderDetailsTitle}>Order Details</Text>
+
+            <View style={styles.orderDetailRow}>
+              <Text style={styles.orderDetailLabel}>Order Number</Text>
+              <Text style={styles.orderDetailValue}>#{orderNumber}</Text>
+            </View>
+
+            <View style={styles.orderDetailRow}>
+              <Text style={styles.orderDetailLabel}>Delivery Type</Text>
+              <Text style={styles.orderDetailValue}>
+                {deliveryType === 'delivery' ? 'Home Delivery' : 'Pickup'}
+              </Text>
+            </View>
+
+            {mealTimePreference && (
+              <View style={styles.orderDetailRow}>
+                <Text style={styles.orderDetailLabel}>Meal Time</Text>
+                <Text style={styles.orderDetailValue}>
+                  {mealTimePreference.toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.orderDetailRow}>
+              <Text style={styles.orderDetailLabel}>Schedule</Text>
+              <Text style={styles.orderDetailValue}>
+                {scheduleType === 'scheduled'
+                  ? `${scheduledDate} at ${scheduledTime}`
+                  : 'Immediate'
+                }
+              </Text>
+            </View>
+
+            {deliveryType === 'delivery' && (
+              <View style={styles.orderDetailRow}>
+                <Text style={styles.orderDetailLabel}>Delivery Address</Text>
+                <Text style={[styles.orderDetailValue, styles.addressText]}>
+                  {deliveryAddress}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            <View style={styles.orderDetailRow}>
+              <Text style={styles.orderDetailLabel}>Total Amount</Text>
+              <Text style={styles.orderTotalValue}>₦{calculateTotal().toFixed(2)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.timelineCard}>
+            <Text style={styles.timelineTitle}>What's Next?</Text>
+
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineIconContainer}>
+                <View style={styles.timelineIcon}>
+                  <CheckCircle size={20} color="#ff8c00" fill="#ff8c00" />
+                </View>
+                <View style={styles.timelineLine} />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineItemTitle}>Order Confirmed</Text>
+                <Text style={styles.timelineItemTime}>Just now</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineIconContainer}>
+                <View style={[styles.timelineIcon, styles.timelineIconPending]}>
+                  <Clock size={20} color="#94a3b8" />
+                </View>
+                <View style={styles.timelineLine} />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineItemTitle}>Vendor Confirmation</Text>
+                <Text style={styles.timelineItemTime}>Within 1 hour</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineIconContainer}>
+                <View style={[styles.timelineIcon, styles.timelineIconPending]}>
+                  <Package size={20} color="#94a3b8" />
+                </View>
+                <View style={styles.timelineLine} />
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineItemTitle}>Preparing Order</Text>
+                <Text style={styles.timelineItemTime}>1-2 hours</Text>
+              </View>
+            </View>
+
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineIconContainer}>
+                <View style={[styles.timelineIcon, styles.timelineIconPending]}>
+                  <Truck size={20} color="#94a3b8" />
+                </View>
+              </View>
+              <View style={styles.timelineContent}>
+                <Text style={styles.timelineItemTitle}>
+                  {deliveryType === 'delivery' ? 'Out for Delivery' : 'Ready for Pickup'}
+                </Text>
+                <Text style={styles.timelineItemTime}>2-4 hours</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => router.replace('/(tabs)/orders')}
+            >
+              <Text style={styles.primaryButtonText}>View My Orders</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => router.replace('/(tabs)')}
+            >
+              <Text style={styles.secondaryButtonText}>Continue Shopping</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Your cart is empty</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButtonHeader} onPress={() => router.back()}>
+          <ChevronLeft size={24} color="#ffffff" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Checkout</Text>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Delivery Method</Text>
+
+          <TouchableOpacity
+            style={[styles.optionCard, deliveryType === 'pickup' && styles.optionCardActive]}
+            onPress={() => setDeliveryType('pickup')}
+          >
+            <View style={styles.optionIcon}>
+              <Package size={24} color={deliveryType === 'pickup' ? '#ff8c00' : '#64748b'} />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Pickup</Text>
+              <Text style={styles.optionDescription}>Pick up from the vendor</Text>
+            </View>
+            {deliveryType === 'pickup' && <View style={styles.selectedDot} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.optionCard, deliveryType === 'delivery' && styles.optionCardActive]}
+            onPress={() => setDeliveryType('delivery')}
+          >
+            <View style={styles.optionIcon}>
+              <Truck size={24} color={deliveryType === 'delivery' ? '#ff8c00' : '#64748b'} />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Delivery</Text>
+              <Text style={styles.optionDescription}>Delivered to your address</Text>
+            </View>
+            {deliveryType === 'delivery' && <View style={styles.selectedDot} />}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Schedule</Text>
+
+          <TouchableOpacity
+            style={[styles.optionCard, scheduleType === 'immediate' && styles.optionCardActive]}
+            onPress={() => setScheduleType('immediate')}
+          >
+            <View style={styles.optionIcon}>
+              <Clock size={24} color={scheduleType === 'immediate' ? '#ff8c00' : '#64748b'} />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Immediate</Text>
+              <Text style={styles.optionDescription}>
+                {deliveryType === 'delivery' ? 'Deliver as soon as possible' : 'Pick up as soon as ready'}
+              </Text>
+            </View>
+            {scheduleType === 'immediate' && <View style={styles.selectedDot} />}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.optionCard, scheduleType === 'scheduled' && styles.optionCardActive]}
+            onPress={() => setScheduleType('scheduled')}
+          >
+            <View style={styles.optionIcon}>
+              <Calendar size={24} color={scheduleType === 'scheduled' ? '#ff8c00' : '#64748b'} />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Schedule</Text>
+              <Text style={styles.optionDescription}>Choose a specific date and time</Text>
+            </View>
+            {scheduleType === 'scheduled' && <View style={styles.selectedDot} />}
+          </TouchableOpacity>
+        </View>
+
+        {scheduleType === 'scheduled' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Date & Time</Text>
+
+            <View style={styles.dateTimeContainer}>
+              <View style={styles.dateTimeInputWrapper}>
+                <Calendar size={20} color="#6b7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.dateTimeInput}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9ca3af"
+                  value={scheduledDate}
+                  onChangeText={setScheduledDate}
+                />
+              </View>
+
+              <View style={styles.dateTimeInputWrapper}>
+                <Clock size={20} color="#6b7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.dateTimeInput}
+                  placeholder="HH:MM (24h)"
+                  placeholderTextColor="#9ca3af"
+                  value={scheduledTime}
+                  onChangeText={setScheduledTime}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.helperText}>
+              Format: Date (2024-12-25), Time (14:30)
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Meal Time Preference (Optional)</Text>
+          <Text style={styles.helperText} style={{ marginBottom: 12 }}>
+            Select if you want this delivered at a specific meal time
+          </Text>
+
+          <View style={styles.mealTimeGrid}>
+            <TouchableOpacity
+              style={[
+                styles.mealTimeOption,
+                mealTimePreference === 'breakfast' && styles.mealTimeOptionActive,
+              ]}
+              onPress={() => setMealTimePreference(mealTimePreference === 'breakfast' ? null : 'breakfast')}
+            >
+              <Sun size={20} color={mealTimePreference === 'breakfast' ? '#ffffff' : '#ff8c00'} />
+              <Text
+                style={[
+                  styles.mealTimeOptionText,
+                  mealTimePreference === 'breakfast' && styles.mealTimeOptionTextActive,
+                ]}
+              >
+                BREAKFAST
+              </Text>
+              <Text
+                style={[
+                  styles.mealTimeOptionTime,
+                  mealTimePreference === 'breakfast' && styles.mealTimeOptionTimeActive,
+                ]}
+              >
+                Before 8 am
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mealTimeOption,
+                mealTimePreference === 'lunch' && styles.mealTimeOptionActive,
+              ]}
+              onPress={() => setMealTimePreference(mealTimePreference === 'lunch' ? null : 'lunch')}
+            >
+              <Utensils size={20} color={mealTimePreference === 'lunch' ? '#ffffff' : '#ff8c00'} />
+              <Text
+                style={[
+                  styles.mealTimeOptionText,
+                  mealTimePreference === 'lunch' && styles.mealTimeOptionTextActive,
+                ]}
+              >
+                LUNCH
+              </Text>
+              <Text
+                style={[
+                  styles.mealTimeOptionTime,
+                  mealTimePreference === 'lunch' && styles.mealTimeOptionTimeActive,
+                ]}
+              >
+                Before 12 pm
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mealTimeOption,
+                mealTimePreference === 'dinner' && styles.mealTimeOptionActive,
+              ]}
+              onPress={() => setMealTimePreference(mealTimePreference === 'dinner' ? null : 'dinner')}
+            >
+              <Moon size={20} color={mealTimePreference === 'dinner' ? '#ffffff' : '#ff8c00'} />
+              <Text
+                style={[
+                  styles.mealTimeOptionText,
+                  mealTimePreference === 'dinner' && styles.mealTimeOptionTextActive,
+                ]}
+              >
+                DINNER
+              </Text>
+              <Text
+                style={[
+                  styles.mealTimeOptionTime,
+                  mealTimePreference === 'dinner' && styles.mealTimeOptionTimeActive,
+                ]}
+              >
+                Before 7 pm
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {deliveryType === 'delivery' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Delivery Information</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              placeholderTextColor="#9ca3af"
+              value={deliveryName}
+              onChangeText={setDeliveryName}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Phone Number"
+              placeholderTextColor="#9ca3af"
+              value={deliveryPhone}
+              onChangeText={setDeliveryPhone}
+              keyboardType="phone-pad"
+            />
+
+            <View style={styles.addressInputContainer}>
+              <MapPin size={20} color="#6b7280" style={styles.addressIcon} />
+              <TextInput
+                style={styles.addressInput}
+                placeholder="Enter your delivery address"
+                placeholderTextColor="#9ca3af"
+                value={deliveryAddress}
+                onChangeText={setDeliveryAddress}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Order Summary</Text>
+          <View style={styles.summaryCard}>
+            {cartItems.map((item) => (
+              <View key={item.id} style={styles.summaryRow}>
+                <Text style={styles.summaryText}>
+                  {item.product.name} x{item.quantity}
+                </Text>
+                <Text style={styles.summaryPrice}>
+                  ₦{(item.product.price * item.quantity).toFixed(2)}
+                </Text>
+              </View>
+            ))}
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryValue}>₦{calculateSubtotal().toFixed(2)}</Text>
+            </View>
+
+            {deliveryType === 'delivery' && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Delivery Fee</Text>
+                <Text style={styles.summaryValue}>₦{DELIVERY_FEE.toFixed(2)}</Text>
+              </View>
+            )}
+
+            <View style={styles.divider} />
+
+            <View style={styles.summaryRow}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalValue}>₦{calculateTotal().toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.placeOrderButton, submitting && styles.buttonDisabled]}
+          onPress={handlePlaceOrder}
+          disabled={submitting}
+        >
+          {submitting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <>
+              <CreditCard size={20} color="#ffffff" style={styles.buttonIcon} />
+              <Text style={styles.placeOrderButtonText}>Place Order</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#6b7280',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#ff8c00',
+    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  header: {
+    backgroundColor: '#ff8c00',
+    paddingTop: 60,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButtonHeader: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 14,
+    letterSpacing: 0.3,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  optionCardActive: {
+    borderColor: '#ff8c00',
+    backgroundColor: '#f0f9ff',
+    shadowColor: '#ff8c00',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  optionIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#f1f5f9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 2,
+  },
+  optionDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  selectedDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#ff8c00',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  input: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 18,
+    fontSize: 16,
+    color: '#1f2937',
+    borderWidth: 2.5,
+    borderColor: '#ff8c00',
+    marginBottom: 16,
+    fontWeight: '600',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  addressInputContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 2.5,
+    borderColor: '#ff8c00',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  addressIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  addressInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    minHeight: 80,
+    textAlignVertical: 'top',
+    fontWeight: '600',
+  },
+  summaryCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 22,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#6b7280',
+    flex: 1,
+  },
+  summaryPrice: {
+    fontSize: 14,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  summaryValue: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 12,
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  totalValue: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#ff8c00',
+    letterSpacing: 0.5,
+  },
+  footer: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderTopWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  placeOrderButton: {
+    flexDirection: 'row',
+    backgroundColor: '#ff8c00',
+    borderRadius: 16,
+    padding: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  placeOrderButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  successContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  successIconContainer: {
+    marginTop: 40,
+    marginBottom: 24,
+  },
+  successIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f0f9ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  successTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#1e293b',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  successMessage: {
+    fontSize: 17,
+    color: '#64748b',
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 20,
+    lineHeight: 24,
+  },
+  orderDetailsCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  orderDetailsTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 20,
+    letterSpacing: 0.3,
+  },
+  orderDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    gap: 16,
+  },
+  orderDetailLabel: {
+    fontSize: 15,
+    color: '#64748b',
+    fontWeight: '500',
+    flex: 1,
+  },
+  orderDetailValue: {
+    fontSize: 15,
+    color: '#1e293b',
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 1,
+  },
+  addressText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  orderTotalValue: {
+    fontSize: 24,
+    color: '#ff8c00',
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  timelineCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 32,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  timelineTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 24,
+    letterSpacing: 0.3,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  timelineIconContainer: {
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  timelineIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#dbeafe',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timelineIconPending: {
+    backgroundColor: '#f1f5f9',
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#e2e8f0',
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  timelineContent: {
+    flex: 1,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  timelineItemTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  timelineItemTime: {
+    fontSize: 14,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 12,
+    marginBottom: 20,
+  },
+  primaryButton: {
+    backgroundColor: '#ff8c00',
+    borderRadius: 16,
+    padding: 18,
+    alignItems: 'center',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  secondaryButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 18,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+  },
+  secondaryButtonText: {
+    color: '#ff8c00',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  dateTimeContainer: {
+    gap: 12,
+  },
+  dateTimeInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 2.5,
+    borderColor: '#ff8c00',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  dateTimeInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '600',
+  },
+  helperText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  mealTimeGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  mealTimeOption: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    gap: 6,
+  },
+  mealTimeOptionActive: {
+    backgroundColor: '#ff8c00',
+    borderColor: '#ff8c00',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  mealTimeOptionText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1e293b',
+    letterSpacing: 0.3,
+  },
+  mealTimeOptionTextActive: {
+    color: '#ffffff',
+  },
+  mealTimeOptionTime: {
+    fontSize: 10,
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  mealTimeOptionTimeActive: {
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+});
