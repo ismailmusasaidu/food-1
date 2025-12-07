@@ -19,6 +19,8 @@ import {
   AlertCircle,
   X,
   CheckCircle,
+  Clock,
+  MapPin,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +57,9 @@ export default function RiderDashboardScreen() {
   const [weeklyEarnings, setWeeklyEarnings] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [deliveryHistory, setDeliveryHistory] = useState<any[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -180,6 +185,7 @@ export default function RiderDashboardScreen() {
         fetchBatchDeliveries(rider),
         fetchNotifications(),
         fetchEarnings(rider.id),
+        fetchDeliveryHistory(rider),
       ]);
     } catch (error: any) {
       console.error('Error fetching rider data:', error);
@@ -376,6 +382,49 @@ export default function RiderDashboardScreen() {
     }
   };
 
+  const fetchDeliveryHistory = async (rider?: Rider) => {
+    const riderData = rider || riderProfile;
+    if (!riderData) return;
+
+    try {
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .eq('assigned_rider_id', riderData.id)
+        .eq('status', 'delivered')
+        .not('delivered_at', 'is', null)
+        .order('delivered_at', { ascending: false });
+
+      const now = new Date();
+      let filterDate = new Date();
+
+      switch (historyFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          query = query.gte('delivered_at', filterDate.toISOString());
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          query = query.gte('delivered_at', filterDate.toISOString());
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          query = query.gte('delivered_at', filterDate.toISOString());
+          break;
+        case 'all':
+          break;
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) throw error;
+
+      setDeliveryHistory(data || []);
+    } catch (error: any) {
+      console.error('Error fetching delivery history:', error);
+    }
+  };
+
   const handleStatusChange = async (newStatus: 'available' | 'busy' | 'offline') => {
     if (!riderProfile) return;
 
@@ -503,6 +552,16 @@ export default function RiderDashboardScreen() {
     setRefreshing(true);
     fetchRiderData();
   };
+
+  const handleFilterChange = (filter: 'today' | 'week' | 'month' | 'all') => {
+    setHistoryFilter(filter);
+  };
+
+  useEffect(() => {
+    if (riderProfile) {
+      fetchDeliveryHistory();
+    }
+  }, [historyFilter]);
 
   if (loading) {
     return (
@@ -683,6 +742,16 @@ export default function RiderDashboardScreen() {
           </View>
         )}
 
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.historyButton}
+            onPress={() => setShowHistory(true)}
+          >
+            <Clock size={20} color="#ffffff" />
+            <Text style={styles.historyButtonText}>View Delivery History</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
@@ -745,6 +814,90 @@ export default function RiderDashboardScreen() {
               <Text style={styles.messageButtonText}>OK</Text>
             </TouchableOpacity>
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showHistory}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowHistory(false)}
+      >
+        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Delivery History</Text>
+            <TouchableOpacity onPress={() => setShowHistory(false)}>
+              <X size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.filterContainer}>
+            {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.filterButton,
+                  historyFilter === filter && styles.filterButtonActive,
+                ]}
+                onPress={() => handleFilterChange(filter)}
+              >
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    historyFilter === filter && styles.filterButtonTextActive,
+                  ]}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <ScrollView style={styles.historyList}>
+            {deliveryHistory.length === 0 ? (
+              <Text style={styles.emptyMessage}>No deliveries found for this period</Text>
+            ) : (
+              deliveryHistory.map((order) => {
+                const deliveredDate = new Date(order.delivered_at);
+                const formattedDate = deliveredDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+                const formattedTime = deliveredDate.toLocaleTimeString('en-US', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+
+                return (
+                  <View key={order.id} style={styles.historyCard}>
+                    <View style={styles.historyCardHeader}>
+                      <View>
+                        <Text style={styles.historyOrderNumber}>#{order.order_number}</Text>
+                        <View style={styles.historyDateContainer}>
+                          <Clock size={14} color="#64748b" />
+                          <Text style={styles.historyDate}>
+                            {formattedDate} at {formattedTime}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.historyAmountContainer}>
+                        <Text style={styles.historyAmount}>₦{order.delivery_fee?.toFixed(2) || '0.00'}</Text>
+                        <Text style={styles.historyAmountLabel}>Earned</Text>
+                      </View>
+                    </View>
+                    <View style={styles.historyAddressContainer}>
+                      <MapPin size={14} color="#ff8c00" />
+                      <Text style={styles.historyAddress} numberOfLines={2}>
+                        {order.delivery_address}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -963,5 +1116,106 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  historyButton: {
+    backgroundColor: '#3b82f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  historyButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#ff8c00',
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  filterButtonTextActive: {
+    color: '#ffffff',
+  },
+  historyList: {
+    flex: 1,
+  },
+  historyCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  historyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  historyOrderNumber: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  historyDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  historyDate: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  historyAmountContainer: {
+    alignItems: 'flex-end',
+  },
+  historyAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#10b981',
+    marginBottom: 2,
+  },
+  historyAmountLabel: {
+    fontSize: 11,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  historyAddressContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fef3c7',
+    padding: 12,
+    borderRadius: 8,
+  },
+  historyAddress: {
+    flex: 1,
+    fontSize: 13,
+    color: '#78350f',
+    lineHeight: 18,
   },
 });
