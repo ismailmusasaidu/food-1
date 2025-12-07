@@ -59,11 +59,26 @@ export default function RiderDashboardScreen() {
   useEffect(() => {
     if (profile) {
       fetchRiderData();
-      setupRealtimeSubscriptions();
     }
   }, [profile]);
 
+  // Setup realtime subscriptions once rider profile is loaded
+  useEffect(() => {
+    if (riderProfile) {
+      console.log('Rider profile loaded, setting up subscriptions');
+      const cleanup = setupRealtimeSubscriptions();
+      return cleanup;
+    }
+  }, [riderProfile]);
+
   const setupRealtimeSubscriptions = () => {
+    if (!riderProfile) {
+      console.log('Cannot setup subscriptions: No rider profile');
+      return;
+    }
+
+    console.log('Setting up realtime subscriptions for rider:', riderProfile.id);
+
     const assignmentsChannel = supabase
       .channel('rider_assignments')
       .on(
@@ -72,12 +87,16 @@ export default function RiderDashboardScreen() {
           event: '*',
           schema: 'public',
           table: 'order_assignments',
+          filter: `rider_id=eq.${riderProfile.id}`,
         },
-        () => {
+        (payload) => {
+          console.log('Realtime assignment change detected:', payload);
           fetchPendingAssignments();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Assignments subscription status:', status);
+      });
 
     const notificationsChannel = supabase
       .channel('rider_notifications')
@@ -151,7 +170,9 @@ export default function RiderDashboardScreen() {
     }
 
     try {
-      console.log('Fetching pending assignments for rider:', riderData.id);
+      console.log('=== FETCHING PENDING ASSIGNMENTS ===');
+      console.log('Rider ID:', riderData.id);
+      console.log('Rider user_id:', riderData.user_id);
       const now = new Date().toISOString();
       console.log('Current time:', now);
 
@@ -179,11 +200,15 @@ export default function RiderDashboardScreen() {
 
       if (error) {
         console.error('Assignment fetch error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
         throw error;
       }
 
-      console.log('Fetched pending assignments:', data?.length || 0, 'assignments');
-      console.log('Assignment details:', JSON.stringify(data, null, 2));
+      console.log('RAW RESPONSE FROM SUPABASE:');
+      console.log('Number of results:', data?.length || 0);
+      console.log('Full data:', JSON.stringify(data, null, 2));
 
       const assignmentsWithVendors = (data || []).map((assignment: any) => {
         const mapped = {
