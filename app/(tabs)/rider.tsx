@@ -21,6 +21,7 @@ import {
   CheckCircle,
   Clock,
   MapPin,
+  Layers,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,6 +61,9 @@ export default function RiderDashboardScreen() {
   const [deliveryHistory, setDeliveryHistory] = useState<any[]>([]);
   const [historyFilter, setHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showHistory, setShowHistory] = useState(false);
+  const [batchHistory, setBatchHistory] = useState<any[]>([]);
+  const [batchHistoryFilter, setBatchHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [showBatchHistory, setShowBatchHistory] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -186,6 +190,7 @@ export default function RiderDashboardScreen() {
         fetchNotifications(),
         fetchEarnings(rider.id),
         fetchDeliveryHistory(rider),
+        fetchBatchHistory(rider),
       ]);
     } catch (error: any) {
       console.error('Error fetching rider data:', error);
@@ -563,6 +568,73 @@ export default function RiderDashboardScreen() {
     }
   }, [historyFilter]);
 
+  useEffect(() => {
+    if (riderProfile) {
+      fetchBatchHistory();
+    }
+  }, [batchHistoryFilter]);
+
+  const fetchBatchHistory = async (rider?: Rider) => {
+    const riderData = rider || riderProfile;
+    if (!riderData) return;
+
+    try {
+      let query = supabase
+        .from('batch_deliveries')
+        .select(`
+          *,
+          batch_delivery_orders (
+            id,
+            order_id,
+            delivered_at,
+            orders!inner (
+              order_number,
+              total
+            )
+          )
+        `)
+        .eq('rider_id', riderData.id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      const now = new Date();
+      let filterDate = new Date();
+
+      switch (batchHistoryFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          query = query.gte('created_at', filterDate.toISOString());
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          query = query.gte('created_at', filterDate.toISOString());
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          query = query.gte('created_at', filterDate.toISOString());
+          break;
+        case 'all':
+          break;
+      }
+
+      const { data, error } = await query.limit(50);
+
+      if (error) throw error;
+
+      const batchesWithOrders = (data || []).map((batch: any) => ({
+        ...batch,
+        orders: batch.batch_delivery_orders.map((item: any) => ({
+          ...item,
+          order: item.orders,
+        })),
+      }));
+
+      setBatchHistory(batchesWithOrders);
+    } catch (error: any) {
+      console.error('Error fetching batch history:', error);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -743,13 +815,23 @@ export default function RiderDashboardScreen() {
         )}
 
         <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.historyButton}
-            onPress={() => setShowHistory(true)}
-          >
-            <Clock size={20} color="#ffffff" />
-            <Text style={styles.historyButtonText}>View Delivery History</Text>
-          </TouchableOpacity>
+          <View style={styles.historyButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.historyButton, styles.historyButtonPrimary]}
+              onPress={() => setShowHistory(true)}
+            >
+              <Clock size={20} color="#ffffff" />
+              <Text style={styles.historyButtonText}>Delivery History</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.historyButton, styles.historyButtonSecondary]}
+              onPress={() => setShowBatchHistory(true)}
+            >
+              <Layers size={20} color="#ffffff" />
+              <Text style={styles.historyButtonText}>Batch History</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -893,6 +975,126 @@ export default function RiderDashboardScreen() {
                       </Text>
                     </View>
                   </View>
+                );
+              })
+            )}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showBatchHistory}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowBatchHistory(false)}
+      >
+        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Batch Delivery History</Text>
+            <TouchableOpacity onPress={() => setShowBatchHistory(false)}>
+              <X size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.filterContainer}>
+            {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.filterButton,
+                  batchHistoryFilter === filter && styles.filterButtonActive,
+                ]}
+                onPress={() => setBatchHistoryFilter(filter)}
+              >
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    batchHistoryFilter === filter && styles.filterButtonTextActive,
+                  ]}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <ScrollView style={styles.historyList}>
+            {batchHistory.length === 0 ? (
+              <Text style={styles.emptyMessage}>No batch deliveries found for this period</Text>
+            ) : (
+              batchHistory.map((batch) => {
+                const getMealTimeLabel = (mealTime: string) => {
+                  switch (mealTime) {
+                    case 'breakfast':
+                      return 'Breakfast';
+                    case 'lunch':
+                      return 'Lunch';
+                    case 'dinner':
+                      return 'Dinner';
+                    default:
+                      return mealTime;
+                  }
+                };
+
+                const getMealTimeColor = (mealTime: string) => {
+                  switch (mealTime) {
+                    case 'breakfast':
+                      return '#f59e0b';
+                    case 'lunch':
+                      return '#10b981';
+                    case 'dinner':
+                      return '#8b5cf6';
+                    default:
+                      return '#64748b';
+                  }
+                };
+
+                const completedDate = new Date(batch.created_at);
+                const formattedDate = completedDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+
+                const totalStops = batch.orders.length;
+                const totalEarnings = batch.orders.reduce((sum: number, order: any) => sum + parseFloat(order.order?.total || 0), 0);
+
+                return (
+                  <TouchableOpacity
+                    key={batch.id}
+                    style={styles.batchHistoryCard}
+                    onPress={() => router.push(`/rider/batch/${batch.id}`)}
+                  >
+                    <View style={styles.batchHistoryHeader}>
+                      <View style={[styles.batchMealBadge, { backgroundColor: getMealTimeColor(batch.meal_time) }]}>
+                        <Layers size={16} color="#ffffff" />
+                        <Text style={styles.batchMealText}>{getMealTimeLabel(batch.meal_time)}</Text>
+                      </View>
+                      <View style={styles.batchDateContainer}>
+                        <Clock size={14} color="#64748b" />
+                        <Text style={styles.batchDate}>{formattedDate}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.batchStopsContainer}>
+                      <View style={styles.batchStopsInfo}>
+                        <Package size={20} color="#ff8c00" />
+                        <Text style={styles.batchStopsText}>
+                          {totalStops} {totalStops === 1 ? 'Stop' : 'Stops'}
+                        </Text>
+                      </View>
+                      <View style={styles.batchCompletedBadge}>
+                        <CheckCircle size={16} color="#10b981" />
+                        <Text style={styles.batchCompletedText}>Completed</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.batchEarningsContainer}>
+                      <Text style={styles.batchEarningsLabel}>Total Earnings</Text>
+                      <Text style={styles.batchEarningsAmount}>₦{totalEarnings.toFixed(2)}</Text>
+                    </View>
+                  </TouchableOpacity>
                 );
               })
             )}
@@ -1117,8 +1319,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
+  historyButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   historyButton: {
-    backgroundColor: '#3b82f6',
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1126,8 +1332,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
+  historyButtonPrimary: {
+    backgroundColor: '#3b82f6',
+  },
+  historyButtonSecondary: {
+    backgroundColor: '#8b5cf6',
+  },
   historyButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#ffffff',
   },
@@ -1217,5 +1429,91 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#78350f',
     lineHeight: 18,
+  },
+  batchHistoryCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  batchHistoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  batchMealBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  batchMealText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  batchDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  batchDate: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  batchStopsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  batchStopsInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  batchStopsText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1e293b',
+  },
+  batchCompletedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  batchCompletedText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#10b981',
+  },
+  batchEarningsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  batchEarningsLabel: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: '600',
+  },
+  batchEarningsAmount: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#10b981',
   },
 });
