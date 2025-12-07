@@ -98,6 +98,25 @@ export default function RiderDashboardScreen() {
         console.log('Assignments subscription status:', status);
       });
 
+    const ordersChannel = supabase
+      .channel('rider_orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `assigned_rider_id=eq.${riderProfile.id}`,
+        },
+        (payload) => {
+          console.log('Realtime order change detected:', payload);
+          fetchActiveOrders();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Orders subscription status:', status);
+      });
+
     const notificationsChannel = supabase
       .channel('rider_notifications')
       .on(
@@ -116,6 +135,7 @@ export default function RiderDashboardScreen() {
 
     return () => {
       supabase.removeChannel(assignmentsChannel);
+      supabase.removeChannel(ordersChannel);
       supabase.removeChannel(notificationsChannel);
     };
   };
