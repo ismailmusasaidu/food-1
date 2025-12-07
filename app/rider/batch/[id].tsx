@@ -22,6 +22,7 @@ import {
   AlertCircle,
   PlayCircle,
   X,
+  Truck,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
@@ -36,6 +37,7 @@ interface BatchDeliveryOrder {
     delivery_address: string;
     total: number;
     customer_id: string;
+    status: string;
   };
   customer: {
     full_name: string;
@@ -117,7 +119,8 @@ export default function BatchDeliveryDetailScreen() {
             order_number,
             delivery_address,
             total,
-            customer_id
+            customer_id,
+            status
           )
         `)
         .eq('batch_id', id)
@@ -155,18 +158,48 @@ export default function BatchDeliveryDetailScreen() {
 
     try {
       setUpdating(true);
-      const { error } = await supabase
+
+      const { error: batchError } = await supabase
         .from('batch_deliveries')
         .update({ status: 'in_progress' })
         .eq('id', batch.id);
 
-      if (error) throw error;
+      if (batchError) throw batchError;
 
-      setSuccessMessage('Batch started! Follow the route to deliver');
+      const orderIds = orders.map(o => o.order_id);
+      const { error: ordersError } = await supabase
+        .from('orders')
+        .update({ status: 'picked_up' })
+        .in('id', orderIds);
+
+      if (ordersError) throw ordersError;
+
+      setSuccessMessage('Batch started! All orders marked as picked up');
       openBatchRoute();
       await fetchBatchDetails();
     } catch (error: any) {
       console.error('Error starting batch:', error);
+      setErrorMessage(error.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleMarkInTransit = async (orderId: string) => {
+    try {
+      setUpdating(true);
+
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'in_transit' })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      setSuccessMessage('Order marked as in transit');
+      await fetchBatchDetails();
+    } catch (error: any) {
+      console.error('Error marking in transit:', error);
       setErrorMessage(error.message);
     } finally {
       setUpdating(false);
@@ -372,9 +405,25 @@ export default function BatchDeliveryDetailScreen() {
                   <Text style={styles.stopOrderNumber}>#{orderItem.order.order_number}</Text>
                   <Text style={styles.stopCustomerName}>{orderItem.customer.full_name}</Text>
                 </View>
-                {orderItem.delivered_at && (
+                {orderItem.delivered_at ? (
                   <View style={styles.deliveredBadge}>
                     <Text style={styles.deliveredText}>Delivered</Text>
+                  </View>
+                ) : batch.status === 'in_progress' && (
+                  <View style={[
+                    styles.statusBadge,
+                    orderItem.order.status === 'in_transit'
+                      ? styles.transitStatusBadge
+                      : styles.pickedUpStatusBadge
+                  ]}>
+                    <Text style={[
+                      styles.statusBadgeText,
+                      orderItem.order.status === 'in_transit'
+                        ? styles.transitStatusText
+                        : styles.pickedUpStatusText
+                    ]}>
+                      {orderItem.order.status === 'in_transit' ? 'In Transit' : 'Picked Up'}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -393,20 +442,40 @@ export default function BatchDeliveryDetailScreen() {
               <View style={styles.stopFooter}>
                 <Text style={styles.stopTotal}>₦{orderItem.order.total.toFixed(2)}</Text>
                 {!orderItem.delivered_at && batch.status === 'in_progress' && (
-                  <TouchableOpacity
-                    style={styles.deliverButton}
-                    onPress={() => handleMarkDelivered(orderItem.id, orderItem.order.id)}
-                    disabled={updating}
-                  >
-                    {updating ? (
-                      <ActivityIndicator size="small" color="#ffffff" />
-                    ) : (
-                      <>
-                        <CheckCircle size={18} color="#ffffff" />
-                        <Text style={styles.deliverButtonText}>Mark Delivered</Text>
-                      </>
+                  <View style={styles.stopActions}>
+                    {orderItem.order.status === 'picked_up' && (
+                      <TouchableOpacity
+                        style={styles.transitButton}
+                        onPress={() => handleMarkInTransit(orderItem.order.id)}
+                        disabled={updating}
+                      >
+                        {updating ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <Truck size={16} color="#ffffff" />
+                            <Text style={styles.transitButtonText}>In Transit</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
+                    {(orderItem.order.status === 'in_transit' || orderItem.order.status === 'picked_up') && (
+                      <TouchableOpacity
+                        style={styles.deliverButton}
+                        onPress={() => handleMarkDelivered(orderItem.id, orderItem.order.id)}
+                        disabled={updating}
+                      >
+                        {updating ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <>
+                            <CheckCircle size={16} color="#ffffff" />
+                            <Text style={styles.deliverButtonText}>Delivered</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
               </View>
             </View>
@@ -682,6 +751,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  pickedUpStatusBadge: {
+    backgroundColor: '#fff7ed',
+  },
+  transitStatusBadge: {
+    backgroundColor: '#dbeafe',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pickedUpStatusText: {
+    color: '#ff8c00',
+  },
+  transitStatusText: {
+    color: '#3b82f6',
+  },
   addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -700,23 +790,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 8,
   },
   stopTotal: {
     fontSize: 18,
     fontWeight: '800',
     color: '#ff8c00',
   },
+  stopActions: {
+    flexDirection: 'row',
+    gap: 8,
+    flexShrink: 1,
+  },
+  transitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  transitButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
   deliverButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#10b981',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   deliverButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: '#ffffff',
   },
