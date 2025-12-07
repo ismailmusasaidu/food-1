@@ -35,7 +35,7 @@ interface OrderDetails {
   total: number;
   delivery_address: string;
   customer_id: string;
-  vendor_user_id: string;
+  vendor_id: string;
   assigned_rider_id: string;
   rider_arrived_at_vendor_at: string | null;
   pickup_confirmed_at: string | null;
@@ -43,6 +43,11 @@ interface OrderDetails {
   delivered_at: string | null;
   customer_confirmation_method: string | null;
   notes?: string;
+  vendors?: {
+    user_id: string;
+    business_name: string;
+    address: string;
+  };
 }
 
 export default function DeliveryDetailScreen() {
@@ -95,7 +100,14 @@ export default function DeliveryDetailScreen() {
       setLoading(true);
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          vendors!inner (
+            user_id,
+            business_name,
+            address
+          )
+        `)
         .eq('id', id)
         .maybeSingle();
 
@@ -116,13 +128,17 @@ export default function DeliveryDetailScreen() {
 
       setCustomerInfo(customer || { full_name: 'Unknown', phone: 'N/A' });
 
-      const { data: vendor } = await supabase
+      const { data: vendorProfile } = await supabase
         .from('profiles')
-        .select('full_name, business_name, business_phone, business_address')
-        .eq('id', orderData.vendor_user_id)
+        .select('business_phone')
+        .eq('id', orderData.vendors?.user_id)
         .maybeSingle();
 
-      setVendorInfo(vendor || { full_name: 'Unknown Vendor', business_address: 'N/A' });
+      setVendorInfo({
+        business_name: orderData.vendors?.business_name || 'Unknown Vendor',
+        business_address: orderData.vendors?.address || 'N/A',
+        business_phone: vendorProfile?.business_phone || null,
+      });
     } catch (error: any) {
       console.error('Error fetching order details:', error);
       setErrorMessage(error.message);
@@ -146,14 +162,16 @@ export default function DeliveryDetailScreen() {
 
       if (error) throw error;
 
-      await supabase.from('notifications').insert({
-        user_id: order.vendor_user_id,
-        type: 'rider_arrived',
-        title: 'Rider Arrived',
-        message: `Rider has arrived to pick up order #${order.order_number}`,
-        data: { order_id: order.id },
-        read: false,
-      });
+      if (order.vendors?.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: order.vendors.user_id,
+          type: 'rider_arrived',
+          title: 'Rider Arrived',
+          message: `Rider has arrived to pick up order #${order.order_number}`,
+          data: { order_id: order.id },
+          read: false,
+        });
+      }
 
       setSuccessMessage('Vendor notified of your arrival');
       await fetchOrderDetails();
@@ -250,15 +268,9 @@ export default function DeliveryDetailScreen() {
 
       if (error) throw error;
 
-      const { data: rider } = await supabase
-        .from('riders')
-        .select('id')
-        .eq('user_id', order.assigned_rider_id)
-        .maybeSingle();
-
-      if (rider) {
+      if (order.assigned_rider_id) {
         await supabase.from('rider_earnings').insert({
-          rider_id: rider.id,
+          rider_id: order.assigned_rider_id,
           order_id: order.id,
           amount: (order.total * 0.1).toString(),
           date: new Date().toISOString().split('T')[0],
@@ -293,17 +305,11 @@ export default function DeliveryDetailScreen() {
     try {
       setUpdating(true);
 
-      const { data: rider } = await supabase
-        .from('riders')
-        .select('id')
-        .eq('user_id', order.assigned_rider_id)
-        .maybeSingle();
-
-      if (!rider) throw new Error('Rider not found');
+      if (!order.assigned_rider_id) throw new Error('Rider not found');
 
       await supabase.from('delivery_issues').insert({
         order_id: order.id,
-        rider_id: rider.id,
+        rider_id: order.assigned_rider_id,
         issue_type: issueType,
         description: issueDescription || null,
         resolved: false,
