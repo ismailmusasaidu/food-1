@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 
 interface Rider {
   id: string;
+  user_id: string;
   full_name: string;
   phone: string;
   current_status: 'available' | 'busy' | 'offline';
@@ -73,14 +74,16 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
       setLoading(true);
       const { data, error } = await supabase
         .from('riders')
-        .select('id, full_name, phone, current_status, rating, total_completed_deliveries')
+        .select('id, user_id, full_name, phone, current_status, rating, total_completed_deliveries')
         .eq('status', 'approved')
         .order('current_status', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched riders:', data);
       setRiders(data || []);
     } catch (error) {
       console.error('Error fetching riders:', error);
+      Alert.alert('Error', 'Failed to load riders. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -113,32 +116,50 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
   };
 
   const assignRiderToOrder = async () => {
-    if (!selectedOrder || !selectedRider) return;
+    if (!selectedOrder || !selectedRider) {
+      Alert.alert('Error', 'Please select both an order and a rider');
+      return;
+    }
 
     try {
       setAssigning(true);
+      console.log('Assigning order:', selectedOrder.id, 'to rider:', selectedRider.id);
 
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
-      const { error: assignmentError } = await supabase
+      const { data: assignmentData, error: assignmentError } = await supabase
         .from('order_assignments')
         .insert({
           order_id: selectedOrder.id,
           rider_id: selectedRider.id,
           expires_at: expiresAt.toISOString(),
           status: 'pending',
-        });
+        })
+        .select()
+        .single();
 
-      if (assignmentError) throw assignmentError;
+      if (assignmentError) {
+        console.error('Assignment error:', assignmentError);
+        throw assignmentError;
+      }
 
-      Alert.alert('Success', `Order ${selectedOrder.order_number} assigned to ${selectedRider.full_name}. They have 10 minutes to accept.`);
+      console.log('Assignment created:', assignmentData);
+
+      // Notification is automatically created by database trigger
+      // But we can add a manual notification as backup if needed
+
+      Alert.alert(
+        'Success',
+        `Order ${selectedOrder.order_number} assigned to ${selectedRider.full_name}. The rider has 10 minutes to accept this assignment.`
+      );
+
       setSelectedOrder(null);
       setSelectedRider(null);
-      fetchUnassignedOrders();
+      await fetchUnassignedOrders();
     } catch (error: any) {
       console.error('Error assigning rider:', error);
-      Alert.alert('Error', error.message || 'Failed to assign rider');
+      Alert.alert('Error', error.message || 'Failed to assign rider. Please try again.');
     } finally {
       setAssigning(false);
     }
@@ -152,6 +173,7 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
 
     try {
       setAssigning(true);
+      console.log('Creating batch delivery for rider:', selectedRider.id, 'with orders:', selectedOrders);
 
       const now = new Date();
       const pickupStart = new Date(now.getTime() + 30 * 60000);
@@ -171,7 +193,12 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
         .select()
         .single();
 
-      if (batchError) throw batchError;
+      if (batchError) {
+        console.error('Batch creation error:', batchError);
+        throw batchError;
+      }
+
+      console.log('Batch created:', batch);
 
       const batchOrders = selectedOrders.map((orderId, index) => ({
         batch_id: batch.id,
@@ -183,14 +210,24 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
         .from('batch_delivery_orders')
         .insert(batchOrders);
 
-      if (ordersError) throw ordersError;
+      if (ordersError) {
+        console.error('Batch orders insert error:', ordersError);
+        throw ordersError;
+      }
+
+      console.log('Batch orders inserted');
 
       const { error: updateError } = await supabase
         .from('orders')
         .update({ assigned_rider_id: selectedRider.id })
         .in('id', selectedOrders);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Orders update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('Orders updated with assigned_rider_id');
 
       Alert.alert(
         'Success',
@@ -199,10 +236,10 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
       setSelectedOrders([]);
       setSelectedRider(null);
       setView('main');
-      fetchUnassignedOrders();
+      await fetchUnassignedOrders();
     } catch (error: any) {
       console.error('Error creating batch:', error);
-      Alert.alert('Error', error.message || 'Failed to create batch delivery');
+      Alert.alert('Error', error.message || 'Failed to create batch delivery. Please try again.');
     } finally {
       setAssigning(false);
     }

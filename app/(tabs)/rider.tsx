@@ -145,9 +145,16 @@ export default function RiderDashboardScreen() {
 
   const fetchPendingAssignments = async (rider?: Rider) => {
     const riderData = rider || riderProfile;
-    if (!riderData) return;
+    if (!riderData) {
+      console.log('No rider data available for fetching assignments');
+      return;
+    }
 
     try {
+      console.log('Fetching pending assignments for rider:', riderData.id);
+      const now = new Date().toISOString();
+      console.log('Current time:', now);
+
       const { data, error } = await supabase
         .from('order_assignments')
         .select(`
@@ -167,12 +174,16 @@ export default function RiderDashboardScreen() {
         `)
         .eq('rider_id', riderData.id)
         .eq('status', 'pending')
-        .gt('expires_at', new Date().toISOString())
+        .gt('expires_at', now)
         .order('assigned_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Assignment fetch error:', error);
+        throw error;
+      }
 
-      console.log('Fetched pending assignments:', data);
+      console.log('Fetched pending assignments:', data?.length || 0, 'assignments');
+      console.log('Assignment details:', JSON.stringify(data, null, 2));
 
       const assignmentsWithVendors = (data || []).map((assignment: any) => ({
         ...assignment,
@@ -183,10 +194,11 @@ export default function RiderDashboardScreen() {
         },
       }));
 
-      console.log('Mapped assignments:', assignmentsWithVendors);
+      console.log('Mapped assignments:', assignmentsWithVendors.length);
       setPendingAssignments(assignmentsWithVendors);
     } catch (error: any) {
       console.error('Error fetching assignments:', error);
+      setErrorMessage('Failed to load assignments');
     }
   };
 
@@ -333,7 +345,22 @@ export default function RiderDashboardScreen() {
   };
 
   const handleAcceptOrder = async (assignmentId: string) => {
+    if (!riderProfile) {
+      setErrorMessage('Rider profile not loaded');
+      return;
+    }
+
     try {
+      console.log('Accepting assignment:', assignmentId);
+
+      const assignment = pendingAssignments.find((a) => a.id === assignmentId);
+      if (!assignment) {
+        console.error('Assignment not found in pending list');
+        setErrorMessage('Assignment not found');
+        return;
+      }
+
+      console.log('Updating assignment status to accepted');
       const { error: assignmentError } = await supabase
         .from('order_assignments')
         .update({
@@ -342,21 +369,26 @@ export default function RiderDashboardScreen() {
         })
         .eq('id', assignmentId);
 
-      if (assignmentError) throw assignmentError;
-
-      const assignment = pendingAssignments.find((a) => a.id === assignmentId);
-      if (assignment) {
-        const { error: orderError } = await supabase
-          .from('orders')
-          .update({
-            status: 'confirmed',
-            assigned_rider_id: riderProfile?.id,
-          })
-          .eq('id', assignment.order_id);
-
-        if (orderError) throw orderError;
+      if (assignmentError) {
+        console.error('Assignment update error:', assignmentError);
+        throw assignmentError;
       }
 
+      console.log('Updating order with rider assignment');
+      const { error: orderError } = await supabase
+        .from('orders')
+        .update({
+          status: 'confirmed',
+          assigned_rider_id: riderProfile.id,
+        })
+        .eq('id', assignment.order_id);
+
+      if (orderError) {
+        console.error('Order update error:', orderError);
+        throw orderError;
+      }
+
+      console.log('Order accepted successfully');
       setSuccessMessage('Order accepted successfully');
       await fetchRiderData();
     } catch (error: any) {
@@ -367,13 +399,19 @@ export default function RiderDashboardScreen() {
 
   const handleRejectOrder = async (assignmentId: string) => {
     try {
+      console.log('Rejecting assignment:', assignmentId);
+
       const { error } = await supabase
         .from('order_assignments')
-        .update({ status: 'cancelled' })
+        .update({ status: 'rejected' })
         .eq('id', assignmentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Rejection error:', error);
+        throw error;
+      }
 
+      console.log('Assignment rejected successfully');
       setSuccessMessage('Order declined');
       await fetchPendingAssignments();
     } catch (error: any) {
