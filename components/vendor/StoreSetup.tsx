@@ -119,7 +119,10 @@ export default function StoreSetup({ onComplete }: StoreSetupProps) {
         .eq('user_id', profile?.id)
         .maybeSingle();
 
+      let vendorId: string;
+
       if (vendorData?.id) {
+        vendorId = vendorData.id;
         // Update existing vendor
         const { error: updateError } = await supabase
           .from('vendors')
@@ -141,7 +144,7 @@ export default function StoreSetup({ onComplete }: StoreSetupProps) {
         if (updateError) throw updateError;
       } else {
         // Create new vendor
-        const { error: insertError } = await supabase
+        const { data: newVendor, error: insertError } = await supabase
           .from('vendors')
           .insert({
             user_id: profile?.id,
@@ -157,9 +160,37 @@ export default function StoreSetup({ onComplete }: StoreSetupProps) {
             delivery_radius: parseFloat(settingsData.deliveryRadius),
             is_verified: true,
             is_active: true,
-          });
+          })
+          .select('id')
+          .single();
 
         if (insertError) throw insertError;
+        vendorId = newVendor.id;
+      }
+
+      // Create or update vendor_settings with is_setup_complete flag
+      const { data: existingSettings } = await supabase
+        .from('vendor_settings')
+        .select('id')
+        .eq('vendor_id', vendorId)
+        .maybeSingle();
+
+      if (existingSettings) {
+        const { error: settingsUpdateError } = await supabase
+          .from('vendor_settings')
+          .update({ is_setup_complete: true })
+          .eq('vendor_id', vendorId);
+
+        if (settingsUpdateError) throw settingsUpdateError;
+      } else {
+        const { error: settingsInsertError } = await supabase
+          .from('vendor_settings')
+          .insert({
+            vendor_id: vendorId,
+            is_setup_complete: true,
+          });
+
+        if (settingsInsertError) throw settingsInsertError;
       }
 
       onComplete();
