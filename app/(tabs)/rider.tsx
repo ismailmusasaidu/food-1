@@ -264,7 +264,7 @@ export default function RiderDashboardScreen() {
         .from('orders')
         .select('*')
         .eq('assigned_rider_id', riderData.id)
-        .in('status', ['confirmed', 'preparing', 'rider_assigned', 'rider_approaching', 'out_for_delivery'])
+        .in('status', ['confirmed', 'preparing', 'rider_assigned', 'rider_approaching', 'picked_up', 'in_transit', 'out_for_delivery'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
