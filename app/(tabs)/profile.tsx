@@ -1,24 +1,64 @@
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, Mail, Phone, LogOut, Shield, Edit, Save, X, Store, MapPin, FileText } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { Vendor } from '@/types/database';
 
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth();
   const insets = useSafeAreaInsets();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [vendorData, setVendorData] = useState<Vendor | null>(null);
+  const [loadingVendor, setLoadingVendor] = useState(true);
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [email, setEmail] = useState(profile?.email || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [businessName, setBusinessName] = useState(profile?.business_name || '');
-  const [businessDescription, setBusinessDescription] = useState(profile?.business_description || '');
-  const [businessAddress, setBusinessAddress] = useState(profile?.business_address || '');
-  const [businessPhone, setBusinessPhone] = useState(profile?.business_phone || '');
+  const [businessName, setBusinessName] = useState('');
+  const [businessDescription, setBusinessDescription] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessPhone, setBusinessPhone] = useState('');
+
+  useEffect(() => {
+    if (profile?.role === 'vendor') {
+      fetchVendorData();
+    } else {
+      setLoadingVendor(false);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (vendorData) {
+      setBusinessName(vendorData.business_name || '');
+      setBusinessDescription(vendorData.description || '');
+      setBusinessAddress(vendorData.address || '');
+      setBusinessPhone(profile?.business_phone || '');
+    }
+  }, [vendorData, profile]);
+
+  const fetchVendorData = async () => {
+    if (!profile) return;
+
+    try {
+      setLoadingVendor(true);
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      setVendorData(data);
+    } catch (error) {
+      console.error('Error fetching vendor data:', error);
+    } finally {
+      setLoadingVendor(false);
+    }
+  };
 
   const handleSignOut = async () => {
     if (Platform.OS === 'web') {
@@ -77,10 +117,21 @@ export default function ProfileScreen() {
       };
 
       if (profile.role === 'vendor') {
-        updates.business_name = businessName.trim();
-        updates.business_description = businessDescription.trim() || null;
-        updates.business_address = businessAddress.trim() || null;
         updates.business_phone = businessPhone.trim() || null;
+
+        if (vendorData) {
+          const { error: vendorError } = await supabase
+            .from('vendors')
+            .update({
+              business_name: businessName.trim(),
+              description: businessDescription.trim() || null,
+              address: businessAddress.trim() || '',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', vendorData.id);
+
+          if (vendorError) throw vendorError;
+        }
       }
 
       const { error } = await supabase
@@ -89,6 +140,10 @@ export default function ProfileScreen() {
         .eq('id', profile.id);
 
       if (error) throw error;
+
+      if (profile.role === 'vendor') {
+        await fetchVendorData();
+      }
 
       if (Platform.OS === 'web') {
         if (emailChanged) {
@@ -99,7 +154,9 @@ export default function ProfileScreen() {
       }
       setIsEditing(false);
 
-      window.location.reload();
+      if (emailChanged) {
+        window.location.reload();
+      }
     } catch (error) {
       console.error('Error updating profile:', error);
       if (Platform.OS === 'web') {
@@ -114,9 +171,11 @@ export default function ProfileScreen() {
     setFullName(profile?.full_name || '');
     setEmail(profile?.email || '');
     setPhone(profile?.phone || '');
-    setBusinessName(profile?.business_name || '');
-    setBusinessDescription(profile?.business_description || '');
-    setBusinessAddress(profile?.business_address || '');
+    if (vendorData) {
+      setBusinessName(vendorData.business_name || '');
+      setBusinessDescription(vendorData.description || '');
+      setBusinessAddress(vendorData.address || '');
+    }
     setBusinessPhone(profile?.business_phone || '');
     setIsEditing(false);
   };
@@ -133,6 +192,15 @@ export default function ProfileScreen() {
         return '#6b7280';
     }
   };
+
+  if (profile?.role === 'vendor' && loadingVendor) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#ff8c00" />
+        <Text style={styles.loadingText}>Loading vendor information...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -269,7 +337,7 @@ export default function ProfileScreen() {
                     placeholderTextColor="#9ca3af"
                   />
                 ) : (
-                  <Text style={styles.infoValue}>{profile?.business_name || 'Not provided'}</Text>
+                  <Text style={styles.infoValue}>{vendorData?.business_name || 'Not provided'}</Text>
                 )}
               </View>
             </View>
@@ -312,7 +380,7 @@ export default function ProfileScreen() {
                     numberOfLines={2}
                   />
                 ) : (
-                  <Text style={styles.infoValue}>{profile?.business_address || 'Not provided'}</Text>
+                  <Text style={styles.infoValue}>{vendorData?.address || 'Not provided'}</Text>
                 )}
               </View>
             </View>
@@ -334,7 +402,7 @@ export default function ProfileScreen() {
                     numberOfLines={3}
                   />
                 ) : (
-                  <Text style={styles.infoValue}>{profile?.business_description || 'Not provided'}</Text>
+                  <Text style={styles.infoValue}>{vendorData?.description || 'Not provided'}</Text>
                 )}
               </View>
             </View>
@@ -381,6 +449,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
   },
   header: {
     backgroundColor: '#ff8c00',
