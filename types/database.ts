@@ -13,6 +13,8 @@ export type OrderStatus =
   | 'ready_for_pickup'
   | 'rider_assigned'
   | 'rider_approaching'
+  | 'picked_up'
+  | 'in_transit'
   | 'out_for_delivery'
   | 'delivered'
   | 'cancelled';
