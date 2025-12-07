@@ -266,7 +266,7 @@ export default function VendorHome() {
               <View style={styles.statIconContainer}>
                 <DollarSign size={24} color="#ffffff" />
               </View>
-              <Text style={styles.statValue}>₦{stats.totalRevenue.toFixed(2)}</Text>
+              <Text style={styles.statValue}>₦{(stats.totalRevenue || 0).toFixed(2)}</Text>
               <Text style={styles.statLabel}>Total Revenue</Text>
             </View>
 
@@ -274,7 +274,7 @@ export default function VendorHome() {
               <View style={[styles.statIconContainer, styles.iconBlue]}>
                 <ShoppingBag size={24} color="#ff8c00" />
               </View>
-              <Text style={styles.statValue}>{stats.pendingOrders}</Text>
+              <Text style={styles.statValue}>{String(stats.pendingOrders)}</Text>
               <Text style={styles.statLabel}>Pending Orders</Text>
             </View>
           </View>
@@ -286,7 +286,7 @@ export default function VendorHome() {
               <View style={[styles.statIconContainer, styles.iconGreen]}>
                 <Package size={24} color="#ff8c00" />
               </View>
-              <Text style={styles.statValue}>{stats.activeProducts}</Text>
+              <Text style={styles.statValue}>{String(stats.activeProducts)}</Text>
               <Text style={styles.statLabel}>Active Products</Text>
             </View>
 
@@ -294,7 +294,7 @@ export default function VendorHome() {
               <View style={[styles.statIconContainer, styles.iconPurple]}>
                 <TrendingUp size={24} color="#ff8c00" />
               </View>
-              <Text style={styles.statValue}>{stats.completedOrders}</Text>
+              <Text style={styles.statValue}>{String(stats.completedOrders)}</Text>
               <Text style={styles.statLabel}>Completed Orders</Text>
             </View>
           </View>
@@ -307,7 +307,7 @@ export default function VendorHome() {
               <View style={styles.alertContent}>
                 <Text style={styles.alertTitle}>Low Stock Alert</Text>
                 <Text style={styles.alertText}>
-                  {stats.lowStockProducts} product(s) are running low on stock
+                  {String(stats.lowStockProducts)} product(s) are running low on stock
                 </Text>
               </View>
             </View>
@@ -332,16 +332,16 @@ export default function VendorHome() {
           <Text style={styles.summaryTitle}>Store Summary</Text>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Products</Text>
-            <Text style={styles.summaryValue}>{stats.totalProducts}</Text>
+            <Text style={styles.summaryValue}>{String(stats.totalProducts)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Active Listings</Text>
-            <Text style={styles.summaryValue}>{stats.activeProducts}</Text>
+            <Text style={styles.summaryValue}>{String(stats.activeProducts)}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Low Stock Items</Text>
             <Text style={[styles.summaryValue, styles.warningText]}>
-              {stats.lowStockProducts}
+              {String(stats.lowStockProducts)}
             </Text>
           </View>
         </View>

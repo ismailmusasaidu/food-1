@@ -58,8 +58,8 @@ export default function VendorScreen() {
 
         if (settingsData?.is_setup_complete) {
           setIsSetupComplete(true);
-          fetchVendorInfo();
-          fetchProducts();
+          const vendor = await fetchVendorInfo();
+          await fetchProducts(vendor);
         }
       }
     } catch (error) {
@@ -81,19 +81,24 @@ export default function VendorScreen() {
 
       if (error) throw error;
       setVendor(data);
+      return data;
     } catch (error) {
       console.error('Error fetching vendor info:', error);
+      return null;
     }
   };
 
-  const fetchProducts = async () => {
-    if (!profile || !vendor) return;
+  const fetchProducts = async (vendorData?: Vendor | null) => {
+    if (!profile) return;
 
     try {
+      const vendorToUse = vendorData || vendor;
+      if (!vendorToUse) return;
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('vendor_id', vendor.id)
+        .eq('vendor_id', vendorToUse.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -106,8 +111,8 @@ export default function VendorScreen() {
   const handleSetupComplete = async () => {
     setIsSetupComplete(true);
     setLoadingVendorData(true);
-    await fetchVendorInfo();
-    await fetchProducts();
+    const vendor = await fetchVendorInfo();
+    await fetchProducts(vendor);
     setLoadingVendorData(false);
   };
 
@@ -295,7 +300,7 @@ export default function VendorScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{vendor.business_name}</Text>
-        <Text style={styles.subtitle}>{products.length} Products</Text>
+        <Text style={styles.subtitle}>{String(products.length)} Products</Text>
       </View>
 
       <TouchableOpacity
@@ -354,7 +359,7 @@ export default function VendorScreen() {
                     filterStatus === 'all' && styles.filterChipTextActive,
                   ]}
                 >
-                  All ({products.length})
+                  All ({String(products.length)})
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -370,7 +375,7 @@ export default function VendorScreen() {
                     filterStatus === 'active' && styles.filterChipTextActive,
                   ]}
                 >
-                  Active ({products.filter(p => p.is_available).length})
+                  Active ({String(products.filter(p => p.is_available).length)})
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -386,7 +391,7 @@ export default function VendorScreen() {
                     filterStatus === 'inactive' && styles.filterChipTextActive,
                   ]}
                 >
-                  Inactive ({products.filter(p => !p.is_available).length})
+                  Inactive ({String(products.filter(p => !p.is_available).length)})
                 </Text>
               </TouchableOpacity>
             </View>
@@ -467,7 +472,7 @@ export default function VendorScreen() {
       {(searchQuery.length > 0 || filterStatus !== 'all' || sortBy !== 'recent') && (
         <View style={styles.searchResults}>
           <Text style={styles.searchResultsText}>
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'result' : 'results'}
+            {String(filteredProducts.length)} {filteredProducts.length === 1 ? 'result' : 'results'}
             {searchQuery && ` for "${searchQuery}"`}
           </Text>
           {(filterStatus !== 'all' || sortBy !== 'recent') && (
@@ -509,7 +514,7 @@ export default function VendorScreen() {
               />
               <View style={styles.productInfo}>
                 <Text style={styles.productName}>{item.name}</Text>
-                <Text style={styles.productPrice}>₦{item.price.toFixed(2)}</Text>
+                <Text style={styles.productPrice}>₦{(item.price || 0).toFixed(2)}</Text>
                 <View style={styles.stockInfo}>
                   <Text
                     style={[
@@ -517,7 +522,7 @@ export default function VendorScreen() {
                       item.stock_quantity > 10 ? styles.inStock : styles.lowStock,
                     ]}
                   >
-                    {item.stock_quantity} in stock
+                    {String(item.stock_quantity)} in stock
                   </Text>
                   <Text
                     style={[
