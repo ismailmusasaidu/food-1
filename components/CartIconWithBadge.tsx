@@ -48,11 +48,11 @@ export default function CartIconWithBadge({ size, color }: CartIconWithBadgeProp
   return (
     <View style={styles.container}>
       <ShoppingCart size={size} color={color} />
-      {cartCount > 0 && (
+      {cartCount > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{cartCount > 99 ? '99+' : String(cartCount)}</Text>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
