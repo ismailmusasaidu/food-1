@@ -8,20 +8,29 @@ import { supabase } from '@/lib/supabase';
 import { Vendor } from '@/types/database';
 
 export default function ProfileScreen() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, refreshProfile } = useAuth();
   const insets = useSafeAreaInsets();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [vendorData, setVendorData] = useState<Vendor | null>(null);
   const [loadingVendor, setLoadingVendor] = useState(true);
 
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [email, setEmail] = useState(profile?.email || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessDescription, setBusinessDescription] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setEmail(profile.email || '');
+      setPhone(profile.phone || '');
+      setBusinessPhone(profile.business_phone || '');
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (profile?.role === 'vendor') {
@@ -36,9 +45,8 @@ export default function ProfileScreen() {
       setBusinessName(vendorData.business_name || '');
       setBusinessDescription(vendorData.description || '');
       setBusinessAddress(vendorData.address || '');
-      setBusinessPhone(profile?.business_phone || '');
     }
-  }, [vendorData, profile]);
+  }, [vendorData]);
 
   const fetchVendorData = async () => {
     if (!profile) return;
@@ -74,7 +82,10 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile) {
+      console.error('No profile found');
+      return;
+    }
 
     if (!fullName.trim()) {
       if (Platform.OS === 'web') {
@@ -102,11 +113,15 @@ export default function ProfileScreen() {
       const emailChanged = email.trim() !== profile.email;
 
       if (emailChanged) {
+        console.log('Updating email...');
         const { error: authError } = await supabase.auth.updateUser({
           email: email.trim(),
         });
 
-        if (authError) throw authError;
+        if (authError) {
+          console.error('Auth update error:', authError);
+          throw authError;
+        }
       }
 
       const updates: any = {
@@ -120,6 +135,12 @@ export default function ProfileScreen() {
         updates.business_phone = businessPhone.trim() || null;
 
         if (vendorData) {
+          console.log('Updating vendor data:', {
+            business_name: businessName.trim(),
+            description: businessDescription.trim() || null,
+            address: businessAddress.trim() || '',
+          });
+
           const { error: vendorError } = await supabase
             .from('vendors')
             .update({
@@ -130,18 +151,32 @@ export default function ProfileScreen() {
             })
             .eq('id', vendorData.id);
 
-          if (vendorError) throw vendorError;
+          if (vendorError) {
+            console.error('Vendor update error:', vendorError);
+            throw vendorError;
+          }
+          console.log('Vendor data updated successfully');
         }
       }
 
-      const { error } = await supabase
+      console.log('Updating profile:', updates);
+      const { data: updatedData, error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', profile.id);
+        .eq('id', profile.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Profile update error:', error);
+        throw error;
+      }
+      console.log('Profile updated successfully:', updatedData);
+
+      console.log('Refreshing profile...');
+      await refreshProfile();
 
       if (profile.role === 'vendor') {
+        console.log('Refreshing vendor data...');
         await fetchVendorData();
       }
 
@@ -153,14 +188,10 @@ export default function ProfileScreen() {
         }
       }
       setIsEditing(false);
-
-      if (emailChanged) {
-        window.location.reload();
-      }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
       if (Platform.OS === 'web') {
-        alert('Failed to update profile. Please try again.');
+        alert(`Failed to update profile: ${error.message || 'Please try again.'}`);
       }
     } finally {
       setIsSaving(false);
