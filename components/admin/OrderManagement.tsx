@@ -11,18 +11,16 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { Package, Clock, CheckCircle, Truck, XCircle, Edit3, X, ArrowLeft, ShoppingBag, Search, Trash2, UserCheck, Navigation } from 'lucide-react-native';
+import { Package, Clock, CheckCircle, Truck, XCircle, Edit3, X, ArrowLeft, MapPin, Search, Trash2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Order, OrderStatus } from '@/types/database';
 
 const statusIcons: Record<OrderStatus, any> = {
   pending: Clock,
   confirmed: CheckCircle,
-  preparing: Package,
-  ready_for_pickup: ShoppingBag,
-  rider_assigned: UserCheck,
-  rider_approaching: Navigation,
-  out_for_delivery: Truck,
+  arrived_at_vendor: MapPin,
+  pickup_complete: Package,
+  arrived_at_customer: Truck,
   delivered: CheckCircle,
   cancelled: XCircle,
 };
@@ -30,24 +28,20 @@ const statusIcons: Record<OrderStatus, any> = {
 const statusColors: Record<OrderStatus, string> = {
   pending: '#f59e0b',
   confirmed: '#10b981',
-  preparing: '#ff8c00',
-  ready_for_pickup: '#ff8c00',
-  rider_assigned: '#3b82f6',
-  rider_approaching: '#8b5cf6',
-  out_for_delivery: '#ff8c00',
+  arrived_at_vendor: '#3b82f6',
+  pickup_complete: '#8b5cf6',
+  arrived_at_customer: '#ff8c00',
   delivered: '#059669',
   cancelled: '#ef4444',
 };
 
 const statusOptions: { value: OrderStatus; label: string }[] = [
   { value: 'pending', label: 'Pending' },
-  { value: 'confirmed', label: 'Order Confirmed' },
-  { value: 'preparing', label: 'Vendor Preparing' },
-  { value: 'ready_for_pickup', label: 'Ready for Pickup' },
-  { value: 'rider_assigned', label: 'Rider Assigned' },
-  { value: 'rider_approaching', label: 'Rider Approaching' },
-  { value: 'out_for_delivery', label: 'Out for Delivery' },
-  { value: 'delivered', label: 'Order Delivered' },
+  { value: 'confirmed', label: 'Confirmed' },
+  { value: 'arrived_at_vendor', label: 'Arrived at Vendor' },
+  { value: 'pickup_complete', label: 'Pickup Complete' },
+  { value: 'arrived_at_customer', label: 'Arrived at Customer' },
+  { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
 

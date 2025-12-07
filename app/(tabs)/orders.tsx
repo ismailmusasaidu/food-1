@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Package, Clock, CheckCircle, Truck, XCircle, ShoppingBag, Search, X, UserCheck, Navigation } from 'lucide-react-native';
+import { Package, Clock, CheckCircle, Truck, XCircle, MapPin, Search, X } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Order, OrderStatus } from '@/types/database';
@@ -19,13 +19,9 @@ import { router } from 'expo-router';
 const statusIcons: Record<OrderStatus, any> = {
   pending: Clock,
   confirmed: CheckCircle,
-  preparing: Package,
-  ready_for_pickup: ShoppingBag,
-  rider_assigned: UserCheck,
-  rider_approaching: Navigation,
-  picked_up: Package,
-  in_transit: Truck,
-  out_for_delivery: Truck,
+  arrived_at_vendor: MapPin,
+  pickup_complete: Package,
+  arrived_at_customer: Truck,
   delivered: CheckCircle,
   cancelled: XCircle,
 };
@@ -33,13 +29,9 @@ const statusIcons: Record<OrderStatus, any> = {
 const statusColors: Record<OrderStatus, string> = {
   pending: '#f59e0b',
   confirmed: '#10b981',
-  preparing: '#ff8c00',
-  ready_for_pickup: '#ff8c00',
-  rider_assigned: '#3b82f6',
-  rider_approaching: '#8b5cf6',
-  picked_up: '#10b981',
-  in_transit: '#8b5cf6',
-  out_for_delivery: '#ff8c00',
+  arrived_at_vendor: '#3b82f6',
+  pickup_complete: '#8b5cf6',
+  arrived_at_customer: '#ff8c00',
   delivered: '#059669',
   cancelled: '#ef4444',
 };

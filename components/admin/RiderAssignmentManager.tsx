@@ -105,7 +105,7 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
         `)
         .eq('delivery_type', 'delivery')
         .is('assigned_rider_id', null)
-        .in('status', ['pending', 'confirmed', 'preparing'])
+        .in('status', ['pending', 'confirmed'])
         .order('created_at', { ascending: true });
 
       if (error) throw error;

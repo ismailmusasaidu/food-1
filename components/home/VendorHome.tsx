@@ -76,7 +76,7 @@ export default function VendorHome() {
 
       const completedOrders = orders.filter((o) => o.status === 'delivered').length;
       const pendingOrders = orders.filter(
-        (o) => o.status === 'pending' || o.status === 'confirmed' || o.status === 'preparing'
+        (o) => o.status === 'pending' || o.status === 'confirmed'
       ).length;
 
       const totalRevenue = orders

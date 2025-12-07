@@ -17,10 +17,7 @@ import {
   MapPin,
   Phone,
   Calendar,
-  ShoppingBag,
   XCircle,
-  UserCheck,
-  Navigation,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Order, OrderStatus } from '@/types/database';
@@ -48,11 +45,9 @@ interface OrderWithItems extends Order {
 const statusIcons: Record<OrderStatus, any> = {
   pending: Clock,
   confirmed: CheckCircle,
-  preparing: Package,
-  ready_for_pickup: ShoppingBag,
-  rider_assigned: UserCheck,
-  rider_approaching: Navigation,
-  out_for_delivery: Truck,
+  arrived_at_vendor: MapPin,
+  pickup_complete: Package,
+  arrived_at_customer: Truck,
   delivered: CheckCircle,
   cancelled: XCircle,
 };
@@ -60,33 +55,29 @@ const statusIcons: Record<OrderStatus, any> = {
 const statusColors: Record<OrderStatus, string> = {
   pending: '#f59e0b',
   confirmed: '#10b981',
-  preparing: '#ff8c00',
-  ready_for_pickup: '#ff8c00',
-  rider_assigned: '#3b82f6',
-  rider_approaching: '#8b5cf6',
-  out_for_delivery: '#ff8c00',
+  arrived_at_vendor: '#3b82f6',
+  pickup_complete: '#8b5cf6',
+  arrived_at_customer: '#ff8c00',
   delivered: '#059669',
   cancelled: '#ef4444',
 };
 
 const statusLabels: Record<OrderStatus, string> = {
   pending: 'Order Placed',
-  confirmed: 'Order Confirmed',
-  preparing: 'Vendor Preparing',
-  ready_for_pickup: 'Ready for Pickup',
-  rider_assigned: 'Rider Assigned',
-  rider_approaching: 'Rider Approaching',
-  out_for_delivery: 'Out for Delivery',
-  delivered: 'Order Delivered',
+  confirmed: 'Confirmed',
+  arrived_at_vendor: 'Arrived at Vendor',
+  pickup_complete: 'Pickup Complete',
+  arrived_at_customer: 'Arrived at Customer',
+  delivered: 'Delivered',
   cancelled: 'Cancelled',
 };
 
 const statusSteps: { status: OrderStatus; label: string; icon: any }[] = [
-  { status: 'confirmed', label: 'Order Confirmed', icon: CheckCircle },
-  { status: 'preparing', label: 'Vendor Preparing', icon: Package },
-  { status: 'rider_assigned', label: 'Rider Assigned', icon: UserCheck },
-  { status: 'rider_approaching', label: 'Rider Approaching', icon: Navigation },
-  { status: 'delivered', label: 'Order Delivered', icon: CheckCircle },
+  { status: 'confirmed', label: 'Confirmed', icon: CheckCircle },
+  { status: 'arrived_at_vendor', label: 'Arrived at Vendor', icon: MapPin },
+  { status: 'pickup_complete', label: 'Pickup Complete', icon: Package },
+  { status: 'arrived_at_customer', label: 'Arrived at Customer', icon: Truck },
+  { status: 'delivered', label: 'Delivered', icon: CheckCircle },
 ];
 
 export default function OrderTrackingScreen() {
@@ -213,11 +204,9 @@ export default function OrderTrackingScreen() {
     const timestamps: Record<string, string | null> = {
       'pending': order.created_at,
       'confirmed': (order as any).confirmed_at || null,
-      'preparing': (order as any).preparing_at || null,
-      'ready_for_pickup': (order as any).ready_for_pickup_at || null,
-      'rider_assigned': (order as any).rider_assigned_at || null,
-      'rider_approaching': (order as any).rider_approaching_at || null,
-      'out_for_delivery': (order as any).out_for_delivery_at || null,
+      'arrived_at_vendor': (order as any).rider_arrived_at_vendor_at || null,
+      'pickup_complete': (order as any).pickup_confirmed_at || null,
+      'arrived_at_customer': (order as any).rider_arrived_at_customer_at || null,
       'delivered': (order as any).delivered_at || null,
     };
     return timestamps[status];

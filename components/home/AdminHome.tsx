@@ -122,7 +122,7 @@ export default function AdminHome() {
       const totalVendors = profiles.filter((p) => p.role === 'vendor').length;
       const activeProducts = products.filter((p) => p.is_available).length;
       const pendingOrders = orders.filter(
-        (o) => o.status === 'pending' || o.status === 'confirmed' || o.status === 'preparing'
+        (o) => o.status === 'pending' || o.status === 'confirmed'
       ).length;
 
       const platformRevenue = orders

@@ -264,7 +264,7 @@ export default function RiderDashboardScreen() {
         .from('orders')
         .select('*')
         .eq('assigned_rider_id', riderData.id)
-        .in('status', ['confirmed', 'preparing', 'rider_assigned', 'rider_approaching', 'picked_up', 'in_transit', 'out_for_delivery'])
+        .in('status', ['confirmed', 'arrived_at_vendor', 'pickup_complete', 'arrived_at_customer'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -431,7 +431,6 @@ export default function RiderDashboardScreen() {
       const { error: orderError } = await supabase
         .from('orders')
         .update({
-          status: 'rider_assigned',
           assigned_rider_id: riderProfile.id,
         })
         .eq('id', assignment.order_id);

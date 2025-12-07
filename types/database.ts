@@ -9,13 +9,9 @@ export type DeliveryStatus = 'assigned' | 'picked_up' | 'in_transit' | 'delivere
 export type OrderStatus =
   | 'pending'
   | 'confirmed'
-  | 'preparing'
-  | 'ready_for_pickup'
-  | 'rider_assigned'
-  | 'rider_approaching'
-  | 'picked_up'
-  | 'in_transit'
-  | 'out_for_delivery'
+  | 'arrived_at_vendor'
+  | 'pickup_complete'
+  | 'arrived_at_customer'
   | 'delivered'
   | 'cancelled';
 

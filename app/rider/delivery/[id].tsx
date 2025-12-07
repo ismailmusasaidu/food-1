@@ -156,7 +156,7 @@ export default function DeliveryDetailScreen() {
         .from('orders')
         .update({
           rider_arrived_at_vendor_at: new Date().toISOString(),
-          status: 'preparing',
+          status: 'arrived_at_vendor',
         })
         .eq('id', order.id);
 
@@ -192,7 +192,7 @@ export default function DeliveryDetailScreen() {
         .from('orders')
         .update({
           pickup_confirmed_at: new Date().toISOString(),
-          status: 'picked_up',
+          status: 'pickup_complete',
         })
         .eq('id', order.id);
 
@@ -227,7 +227,7 @@ export default function DeliveryDetailScreen() {
         .from('orders')
         .update({
           rider_arrived_at_customer_at: new Date().toISOString(),
-          status: 'in_transit',
+          status: 'arrived_at_customer',
         })
         .eq('id', order.id);
 
