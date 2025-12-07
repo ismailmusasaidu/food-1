@@ -42,11 +42,25 @@ export default function OrderAssignmentCard({
   const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
+    console.log('OrderAssignmentCard mounted with:', {
+      id: assignment.id,
+      order_number: assignment.order?.order_number,
+      vendor_name: assignment.vendor?.name,
+      expires_at: assignment.expires_at,
+    });
+  }, []);
+
+  useEffect(() => {
     const calculateTimeLeft = () => {
-      const expiresAt = new Date(assignment.expires_at).getTime();
-      const now = Date.now();
-      const diff = Math.max(0, expiresAt - now);
-      setTimeLeft(Math.floor(diff / 1000));
+      try {
+        const expiresAt = new Date(assignment.expires_at).getTime();
+        const now = Date.now();
+        const diff = Math.max(0, expiresAt - now);
+        setTimeLeft(Math.floor(diff / 1000));
+      } catch (error) {
+        console.error('Error calculating time left:', error);
+        setTimeLeft(0);
+      }
     };
 
     calculateTimeLeft();
@@ -87,6 +101,15 @@ export default function OrderAssignmentCard({
 
   const isExpired = timeLeft === 0;
   const isUrgent = timeLeft <= 30;
+
+  if (!assignment || !assignment.order || !assignment.vendor) {
+    console.error('Invalid assignment data:', assignment);
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Error loading assignment</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, isExpired && styles.expiredContainer]}>
@@ -357,5 +380,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#ef4444',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#ef4444',
+    textAlign: 'center',
+    padding: 16,
   },
 });

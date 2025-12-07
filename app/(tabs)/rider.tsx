@@ -185,16 +185,24 @@ export default function RiderDashboardScreen() {
       console.log('Fetched pending assignments:', data?.length || 0, 'assignments');
       console.log('Assignment details:', JSON.stringify(data, null, 2));
 
-      const assignmentsWithVendors = (data || []).map((assignment: any) => ({
-        ...assignment,
-        order: assignment.orders,
-        vendor: {
-          name: assignment.orders.vendors?.business_name || 'Unknown Vendor',
-          address: assignment.orders.vendors?.address || 'N/A',
-        },
-      }));
+      const assignmentsWithVendors = (data || []).map((assignment: any) => {
+        const mapped = {
+          ...assignment,
+          order: {
+            order_number: assignment.orders?.order_number || 'N/A',
+            total: parseFloat(assignment.orders?.total || 0),
+            delivery_address: assignment.orders?.delivery_address || 'N/A',
+          },
+          vendor: {
+            name: assignment.orders?.vendors?.business_name || 'Unknown Vendor',
+            address: assignment.orders?.vendors?.address || 'N/A',
+          },
+        };
+        console.log('Mapped assignment:', JSON.stringify(mapped, null, 2));
+        return mapped;
+      });
 
-      console.log('Mapped assignments:', assignmentsWithVendors.length);
+      console.log('Total mapped assignments:', assignmentsWithVendors.length);
       setPendingAssignments(assignmentsWithVendors);
     } catch (error: any) {
       console.error('Error fetching assignments:', error);
@@ -489,20 +497,28 @@ export default function RiderDashboardScreen() {
           />
         </View>
 
-        {pendingAssignments.length > 0 && (
+        {pendingAssignments.length > 0 ? (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <AlertCircle size={20} color="#ff8c00" />
-              <Text style={styles.sectionTitle}>New Order Assignments</Text>
+              <Text style={styles.sectionTitle}>New Order Assignments ({pendingAssignments.length})</Text>
             </View>
-            {pendingAssignments.map((assignment) => (
-              <OrderAssignmentCard
-                key={assignment.id}
-                assignment={assignment}
-                onAccept={handleAcceptOrder}
-                onReject={handleRejectOrder}
-              />
-            ))}
+            {pendingAssignments.map((assignment) => {
+              console.log('Rendering assignment card for:', assignment.id);
+              console.log('Assignment data:', JSON.stringify(assignment, null, 2));
+              return (
+                <OrderAssignmentCard
+                  key={assignment.id}
+                  assignment={assignment}
+                  onAccept={handleAcceptOrder}
+                  onReject={handleRejectOrder}
+                />
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.emptyMessage}>No pending assignments</Text>
           </View>
         )}
 
@@ -795,6 +811,12 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 32,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+    padding: 20,
   },
   modalContainer: {
     flex: 1,
