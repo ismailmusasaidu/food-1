@@ -77,12 +77,21 @@ export default function VendorManagement({ onBack }: VendorManagementProps) {
   const handleApprove = async (vendorId: string) => {
     try {
       setProcessing(true);
-      const { error } = await supabase
+
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ vendor_status: 'approved' })
         .eq('id', vendorId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .update({ is_verified: true })
+        .eq('user_id', vendorId);
+
+      if (vendorError) throw vendorError;
+
       await fetchVendors();
       setShowModal(false);
       setSelectedVendor(null);
@@ -100,7 +109,8 @@ export default function VendorManagement({ onBack }: VendorManagementProps) {
 
     try {
       setProcessing(true);
-      const { error } = await supabase
+
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({
           vendor_status: 'rejected',
@@ -108,7 +118,15 @@ export default function VendorManagement({ onBack }: VendorManagementProps) {
         })
         .eq('id', vendorId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
+
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .update({ is_verified: false, is_active: false })
+        .eq('user_id', vendorId);
+
+      if (vendorError) throw vendorError;
+
       await fetchVendors();
       setShowModal(false);
       setSelectedVendor(null);
