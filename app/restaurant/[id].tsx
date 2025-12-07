@@ -161,13 +161,13 @@ export default function RestaurantDetail() {
           <View style={styles.vendorMeta}>
             <View style={styles.metaItem}>
               <Star size={16} color="#fbbf24" fill="#fbbf24" />
-              <Text style={styles.metaText}>{vendor.rating.toFixed(1)}</Text>
+              <Text style={styles.metaText}>{(vendor.rating || 0).toFixed(1)}</Text>
             </View>
 
             {vendor.average_preparation_time && (
               <View style={styles.metaItem}>
                 <Clock size={16} color="#64748b" />
-                <Text style={styles.metaText}>{vendor.average_preparation_time} min</Text>
+                <Text style={styles.metaText}>{String(vendor.average_preparation_time)} min</Text>
               </View>
             )}
 
@@ -191,7 +191,7 @@ export default function RestaurantDetail() {
 
           {vendor.minimum_order && vendor.minimum_order > 0 && (
             <Text style={styles.minOrderText}>
-              Minimum order: ${vendor.minimum_order.toFixed(2)}
+              Minimum order: ${(vendor.minimum_order || 0).toFixed(2)}
             </Text>
           )}
 
@@ -234,11 +234,11 @@ export default function RestaurantDetail() {
 
                       <View style={styles.productFooter}>
                         <View>
-                          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+                          <Text style={styles.productPrice}>${(item.price || 0).toFixed(2)}</Text>
                           {item.preparation_time && (
                             <View style={styles.prepTimeContainer}>
                               <Clock size={12} color="#64748b" />
-                              <Text style={styles.prepTimeText}>{item.preparation_time} min</Text>
+                              <Text style={styles.prepTimeText}>{String(item.preparation_time)} min</Text>
                             </View>
                           )}
                         </View>
@@ -257,9 +257,9 @@ export default function RestaurantDetail() {
                       {item.rating > 0 && (
                         <View style={styles.ratingContainer}>
                           <Star size={12} color="#fbbf24" fill="#fbbf24" />
-                          <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
+                          <Text style={styles.ratingText}>{(item.rating || 0).toFixed(1)}</Text>
                           {item.total_reviews > 0 && (
-                            <Text style={styles.reviewCount}>({item.total_reviews})</Text>
+                            <Text style={styles.reviewCount}>({String(item.total_reviews)})</Text>
                           )}
                         </View>
                       )}

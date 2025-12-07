@@ -297,16 +297,16 @@ export default function ProductDetailModal({
                   <Text style={styles.productName}>{currentProduct.name}</Text>
                   <View style={styles.stockBadge}>
                     <View style={styles.stockDot} />
-                    <Text style={styles.stockText}>{currentProduct.stock_quantity} left</Text>
+                    <Text style={styles.stockText}>{String(currentProduct.stock_quantity)} left</Text>
                   </View>
                 </View>
 
                 <View style={styles.ratingRow}>
                   <View style={styles.ratingContainer}>
                     <Star size={16} color="#fbbf24" fill="#fbbf24" />
-                    <Text style={styles.rating}>{currentProduct.rating.toFixed(1)}</Text>
+                    <Text style={styles.rating}>{(currentProduct.rating || 0).toFixed(1)}</Text>
                   </View>
-                  <Text style={styles.reviewCount}>{currentProduct.total_reviews} reviews</Text>
+                  <Text style={styles.reviewCount}>{String(currentProduct.total_reviews || 0)} reviews</Text>
                 </View>
               </View>
 
@@ -314,7 +314,7 @@ export default function ProductDetailModal({
                 <View style={styles.priceContainer}>
                   <Text style={styles.priceLabel}>Price</Text>
                   <View style={styles.priceRow}>
-                    <Text style={styles.price}>₦{currentProduct.price.toFixed(2)}</Text>
+                    <Text style={styles.price}>₦{(currentProduct.price || 0).toFixed(2)}</Text>
                     <Text style={styles.unit}>/ {currentProduct.unit}</Text>
                   </View>
                 </View>
@@ -349,7 +349,7 @@ export default function ProductDetailModal({
                       <View style={styles.vendorRatingBadge}>
                         <Star size={12} color="#fbbf24" fill="#fbbf24" />
                         <Text style={styles.vendorRatingText}>
-                          {vendorInfo.rating.toFixed(1)}
+                          {(vendorInfo.rating || 0).toFixed(1)}
                         </Text>
                       </View>
                     </View>
@@ -378,7 +378,7 @@ export default function ProductDetailModal({
                       <Minus size={18} color={quantity === 1 ? '#d1d5db' : '#6b7280'} strokeWidth={2.5} />
                     </TouchableOpacity>
                     <View style={styles.quantityDisplay}>
-                      <Text style={styles.quantity}>{quantity}</Text>
+                      <Text style={styles.quantity}>{String(quantity)}</Text>
                     </View>
                     <TouchableOpacity
                       style={[styles.quantityButton, quantity >= currentProduct.stock_quantity && styles.quantityButtonDisabled]}
@@ -391,7 +391,7 @@ export default function ProductDetailModal({
                   <View style={styles.subtotalContainer}>
                     <Text style={styles.subtotalLabel}>Subtotal</Text>
                     <Text style={styles.subtotalAmount}>
-                      ₦{(currentProduct.price * quantity).toFixed(2)}
+                      ₦{((currentProduct.price || 0) * quantity).toFixed(2)}
                     </Text>
                   </View>
                 </View>
