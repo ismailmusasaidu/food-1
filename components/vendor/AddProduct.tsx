@@ -273,11 +273,21 @@ export default function AddProduct({ onBack, onSuccess }: AddProductProps) {
     try {
       setLoading(true);
 
-      // vendor_id in products table references profiles.id, not vendors.id
+      const { data: vendor, error: vendorError } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (vendorError || !vendor) {
+        Alert.alert('Error', 'Vendor account not found. Please complete store setup first.');
+        return;
+      }
+
       const { data: product, error: productError } = await supabase
         .from('products')
         .insert({
-          vendor_id: profile.id,
+          vendor_id: vendor.id,
           category_id: formData.category_id,
           name: formData.name.trim(),
           description: formData.description.trim() || null,

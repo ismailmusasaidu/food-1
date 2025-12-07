@@ -109,11 +109,27 @@ export default function VendorHome() {
   };
 
   useEffect(() => {
-    // vendor_id in products and orders references profile.id, not vendors.id
-    if (profile) {
-      console.log('Vendor ID found:', profile.id);
-      setVendorId(profile.id);
-    }
+    const fetchVendorId = async () => {
+      if (!profile) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('user_id', profile.id)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          console.log('Vendor ID found:', data.id);
+          setVendorId(data.id);
+        }
+      } catch (error) {
+        console.error('Error fetching vendor ID:', error);
+      }
+    };
+
+    fetchVendorId();
   }, [profile]);
 
   useEffect(() => {

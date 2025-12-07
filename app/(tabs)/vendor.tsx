@@ -87,13 +87,13 @@ export default function VendorScreen() {
   };
 
   const fetchProducts = async () => {
-    if (!profile) return;
+    if (!profile || !vendor) return;
 
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('vendor_id', profile.id)
+        .eq('vendor_id', vendor.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

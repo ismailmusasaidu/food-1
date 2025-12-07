@@ -109,8 +109,20 @@ export default function VendorOrderManagement({ onBack }: VendorOrderManagementP
   const fetchVendorId = async () => {
     if (!profile) return;
 
-    // vendor_id in orders references profile.id, not vendors.id
-    setVendorId(profile.id);
+    try {
+      const { data, error } = await supabase
+        .from('vendors')
+        .select('id')
+        .eq('user_id', profile.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setVendorId(data.id);
+      }
+    } catch (error) {
+      console.error('Error fetching vendor ID:', error);
+    }
   };
 
   const fetchOrders = async () => {
