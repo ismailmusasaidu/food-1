@@ -58,18 +58,8 @@ export default function OrdersScreen() {
             table: 'orders',
             filter: `customer_id=eq.${profile.id}`,
           },
-          (payload) => {
-            if (payload.eventType === 'INSERT') {
-              setOrders((prev) => [payload.new as Order, ...prev]);
-            } else if (payload.eventType === 'UPDATE') {
-              setOrders((prev) =>
-                prev.map((order) =>
-                  order.id === payload.new.id ? (payload.new as Order) : order
-                )
-              );
-            } else if (payload.eventType === 'DELETE') {
-              setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
-            }
+          () => {
+            fetchOrders();
           }
         )
         .subscribe();

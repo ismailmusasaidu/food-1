@@ -100,10 +100,8 @@ export default function OrderTrackingScreen() {
             table: 'orders',
             filter: `id=eq.${orderId}`,
           },
-          (payload) => {
-            if (payload.new) {
-              setOrder((prev) => (prev ? { ...prev, ...payload.new } : null));
-            }
+          () => {
+            fetchOrderDetails();
           }
         )
         .subscribe();

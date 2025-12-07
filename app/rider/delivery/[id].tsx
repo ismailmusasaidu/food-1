@@ -82,10 +82,8 @@ export default function DeliveryDetailScreen() {
           table: 'orders',
           filter: `id=eq.${id}`,
         },
-        (payload) => {
-          if (payload.new) {
-            setOrder((prev) => (prev ? { ...prev, ...payload.new } : null));
-          }
+        () => {
+          fetchOrderDetails();
         }
       )
       .subscribe();
