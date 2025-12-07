@@ -99,7 +99,7 @@ export default function RiderDashboardScreen() {
       });
 
     const ordersChannel = supabase
-      .channel('rider_orders')
+      .channel(`rider_orders_${riderProfile.id}`)
       .on(
         'postgres_changes',
         {
@@ -109,12 +109,20 @@ export default function RiderDashboardScreen() {
           filter: `assigned_rider_id=eq.${riderProfile.id}`,
         },
         (payload) => {
-          console.log('Realtime order change detected:', payload);
+          console.log('=== REALTIME ORDER UPDATE ===');
+          console.log('Event:', payload.eventType);
+          console.log('Order ID:', payload.new?.id || payload.old?.id);
+          console.log('New Status:', payload.new?.status);
+          console.log('Payload:', JSON.stringify(payload, null, 2));
+          console.log('Refetching active orders...');
           fetchActiveOrders();
         }
       )
       .subscribe((status) => {
-        console.log('Orders subscription status:', status);
+        console.log('Orders realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to order updates');
+        }
       });
 
     const notificationsChannel = supabase
@@ -260,15 +268,18 @@ export default function RiderDashboardScreen() {
     if (!riderData) return;
 
     try {
+      console.log('Fetching active orders for rider:', riderData.id);
       const { data, error } = await supabase
         .from('orders')
         .select('*')
         .eq('assigned_rider_id', riderData.id)
-        .in('status', ['confirmed', 'arrived_at_vendor', 'pickup_complete', 'arrived_at_customer'])
+        .not('status', 'in', '(delivered,cancelled)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      console.log('Active orders fetched:', data?.length || 0);
+      console.log('Order statuses:', data?.map(o => o.status).join(', '));
       setActiveOrders(data || []);
     } catch (error: any) {
       console.error('Error fetching active orders:', error);
@@ -633,25 +644,42 @@ export default function RiderDashboardScreen() {
 
         {activeOrders.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Active Deliveries</Text>
-            {activeOrders.map((order) => (
-              <TouchableOpacity
-                key={order.id}
-                style={styles.orderCard}
-                onPress={() => router.push(`/rider/delivery/${order.id}`)}
-              >
-                <View style={styles.orderHeader}>
-                  <Text style={styles.orderNumber}>#{order.order_number}</Text>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>{order.status}</Text>
+            <Text style={styles.sectionTitle}>Active Deliveries ({activeOrders.length})</Text>
+            {activeOrders.map((order) => {
+              const getStatusDisplay = (status: string) => {
+                const statusMap: Record<string, { label: string; color: string; bg: string }> = {
+                  confirmed: { label: 'Confirmed', color: '#3b82f6', bg: '#dbeafe' },
+                  arrived_at_vendor: { label: 'At Vendor', color: '#8b5cf6', bg: '#ede9fe' },
+                  pickup_complete: { label: 'Picked Up', color: '#10b981', bg: '#d1fae5' },
+                  arrived_at_customer: { label: 'At Customer', color: '#f59e0b', bg: '#fef3c7' },
+                  pending: { label: 'Pending', color: '#6b7280', bg: '#f3f4f6' },
+                };
+                return statusMap[status] || { label: status, color: '#64748b', bg: '#f1f5f9' };
+              };
+
+              const statusInfo = getStatusDisplay(order.status);
+
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={styles.orderCard}
+                  onPress={() => router.push(`/rider/delivery/${order.id}`)}
+                >
+                  <View style={styles.orderHeader}>
+                    <Text style={styles.orderNumber}>#{order.order_number}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                      <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                        {statusInfo.label}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                <Text style={styles.orderAddress} numberOfLines={2}>
-                  {order.delivery_address}
-                </Text>
-                <Text style={styles.orderTotal}>₦{order.total.toFixed(2)}</Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={styles.orderAddress} numberOfLines={2}>
+                    {order.delivery_address}
+                  </Text>
+                  <Text style={styles.orderTotal}>₦{order.total.toFixed(2)}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -854,7 +882,6 @@ const styles = StyleSheet.create({
     color: '#1e293b',
   },
   statusBadge: {
-    backgroundColor: '#f1f5f9',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -862,8 +889,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#64748b',
-    textTransform: 'capitalize',
   },
   orderAddress: {
     fontSize: 14,
