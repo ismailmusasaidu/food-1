@@ -411,7 +411,7 @@ export default function RiderDashboardScreen() {
       const { error: orderError } = await supabase
         .from('orders')
         .update({
-          status: 'confirmed',
+          status: 'rider_assigned',
           assigned_rider_id: riderProfile.id,
         })
         .eq('id', assignment.order_id);
