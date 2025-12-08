@@ -179,6 +179,7 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
       const pickupStart = new Date(now.getTime() + 30 * 60000);
       const pickupEnd = new Date(now.getTime() + 60 * 60000);
       const deliveryDeadline = new Date(now.getTime() + 120 * 60000);
+      const expiresAt = new Date(now.getTime() + 10 * 60000);
 
       const { data: batch, error: batchError } = await supabase
         .from('batch_deliveries')
@@ -188,7 +189,9 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
           pickup_window_start: pickupStart.toISOString(),
           pickup_window_end: pickupEnd.toISOString(),
           delivery_deadline: deliveryDeadline.toISOString(),
-          status: 'pending',
+          status: 'assigned',
+          assigned_at: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
         })
         .select()
         .single();
@@ -217,6 +220,19 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
 
       console.log('Batch orders inserted');
 
+      await supabase.from('notifications').insert({
+        user_id: selectedRider.user_id,
+        type: 'batch_assignment',
+        title: 'New Batch Delivery Assignment',
+        message: `You have been assigned a ${mealTime} batch with ${selectedOrders.length} deliveries. Accept within 10 minutes.`,
+        data: {
+          batch_id: batch.id,
+          meal_time: mealTime,
+          order_count: selectedOrders.length,
+          expires_at: expiresAt.toISOString(),
+        },
+      });
+
       const { error: updateError } = await supabase
         .from('orders')
         .update({ assigned_rider_id: selectedRider.id })
@@ -231,7 +247,7 @@ export default function RiderAssignmentManager({ onBack }: RiderAssignmentManage
 
       Alert.alert(
         'Success',
-        `Batch delivery created with ${selectedOrders.length} orders assigned to ${selectedRider.full_name}`
+        `Batch delivery assigned to ${selectedRider.full_name} with ${selectedOrders.length} orders. The rider has 10 minutes to accept this assignment.`
       );
       setSelectedOrders([]);
       setSelectedRider(null);

@@ -29,7 +29,7 @@ import { router } from 'expo-router';
 import StatusToggle from '@/components/rider/StatusToggle';
 import OrderAssignmentCard from '@/components/rider/OrderAssignmentCard';
 import NotificationsList, { RiderNotification } from '@/components/rider/NotificationsList';
-import BatchDeliveryCard from '@/components/rider/BatchDeliveryCard';
+import BatchAssignmentCard from '@/components/rider/BatchAssignmentCard';
 
 interface Rider {
   id: string;
@@ -49,8 +49,8 @@ export default function RiderDashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [riderProfile, setRiderProfile] = useState<Rider | null>(null);
   const [pendingAssignments, setPendingAssignments] = useState<any[]>([]);
+  const [batchAssignments, setBatchAssignments] = useState<any[]>([]);
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
-  const [batchDeliveries, setBatchDeliveries] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<RiderNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -61,9 +61,6 @@ export default function RiderDashboardScreen() {
   const [deliveryHistory, setDeliveryHistory] = useState<any[]>([]);
   const [historyFilter, setHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showHistory, setShowHistory] = useState(false);
-  const [batchHistory, setBatchHistory] = useState<any[]>([]);
-  const [batchHistoryFilter, setBatchHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
-  const [showBatchHistory, setShowBatchHistory] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -134,6 +131,25 @@ export default function RiderDashboardScreen() {
         }
       });
 
+    const batchAssignmentsChannel = supabase
+      .channel('rider_batch_assignments')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'batch_deliveries',
+          filter: `rider_id=eq.${riderProfile.id}`,
+        },
+        (payload) => {
+          console.log('Realtime batch assignment change detected:', payload);
+          fetchBatchAssignments();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Batch assignments subscription status:', status);
+      });
+
     const notificationsChannel = supabase
       .channel('rider_notifications')
       .on(
@@ -153,6 +169,7 @@ export default function RiderDashboardScreen() {
     return () => {
       supabase.removeChannel(assignmentsChannel);
       supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(batchAssignmentsChannel);
       supabase.removeChannel(notificationsChannel);
     };
   };
@@ -185,12 +202,11 @@ export default function RiderDashboardScreen() {
 
       await Promise.all([
         fetchPendingAssignments(rider),
+        fetchBatchAssignments(rider),
         fetchActiveOrders(rider),
-        fetchBatchDeliveries(rider),
         fetchNotifications(),
         fetchEarnings(rider.id),
         fetchDeliveryHistory(rider),
-        fetchBatchHistory(rider),
       ]);
     } catch (error: any) {
       console.error('Error fetching rider data:', error);
@@ -297,44 +313,43 @@ export default function RiderDashboardScreen() {
     }
   };
 
-  const fetchBatchDeliveries = async (rider?: Rider) => {
+  const fetchBatchAssignments = async (rider?: Rider) => {
     const riderData = rider || riderProfile;
     if (!riderData) return;
 
     try {
+      console.log('Fetching batch assignments for rider:', riderData.id);
+      const now = new Date().toISOString();
+
       const { data, error } = await supabase
         .from('batch_deliveries')
         .select(`
           *,
           batch_delivery_orders (
             id,
-            order_id,
             delivery_sequence,
-            delivered_at,
             orders!inner (
               order_number,
               delivery_address,
-              total
+              total,
+              vendors!inner (
+                business_name,
+                address
+              )
             )
           )
         `)
         .eq('rider_id', riderData.id)
-        .in('status', ['pending', 'in_progress'])
-        .order('pickup_window_start', { ascending: true });
+        .eq('status', 'assigned')
+        .gt('expires_at', now)
+        .order('assigned_at', { ascending: false });
 
       if (error) throw error;
 
-      const batchesWithOrders = (data || []).map((batch: any) => ({
-        ...batch,
-        orders: batch.batch_delivery_orders.map((item: any) => ({
-          ...item,
-          order: item.orders,
-        })),
-      }));
-
-      setBatchDeliveries(batchesWithOrders);
+      console.log('Batch assignments fetched:', data?.length || 0);
+      setBatchAssignments(data || []);
     } catch (error: any) {
-      console.error('Error fetching batch deliveries:', error);
+      console.error('Error fetching batch assignments:', error);
     }
   };
 
@@ -537,6 +552,58 @@ export default function RiderDashboardScreen() {
     }
   };
 
+  const handleAcceptBatch = async (batchId: string) => {
+    try {
+      console.log('Accepting batch:', batchId);
+
+      const { error } = await supabase
+        .from('batch_deliveries')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+        })
+        .eq('id', batchId);
+
+      if (error) {
+        console.error('Batch acceptance error:', error);
+        throw error;
+      }
+
+      console.log('Batch accepted successfully');
+      setSuccessMessage('Batch delivery accepted successfully');
+      await fetchBatchAssignments();
+    } catch (error: any) {
+      console.error('Error accepting batch:', error);
+      setErrorMessage(error.message || 'Failed to accept batch delivery');
+    }
+  };
+
+  const handleRejectBatch = async (batchId: string) => {
+    try {
+      console.log('Rejecting batch:', batchId);
+
+      const { error } = await supabase
+        .from('batch_deliveries')
+        .update({
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+        })
+        .eq('id', batchId);
+
+      if (error) {
+        console.error('Batch rejection error:', error);
+        throw error;
+      }
+
+      console.log('Batch rejected successfully');
+      setSuccessMessage('Batch delivery declined');
+      await fetchBatchAssignments();
+    } catch (error: any) {
+      console.error('Error rejecting batch:', error);
+      setErrorMessage(error.message || 'Failed to decline batch delivery');
+    }
+  };
+
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       await supabase
@@ -705,7 +772,7 @@ export default function RiderDashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {pendingAssignments.length > 0 ? (
+        {pendingAssignments.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <AlertCircle size={20} color="#ff8c00" />
@@ -724,9 +791,22 @@ export default function RiderDashboardScreen() {
               );
             })}
           </View>
-        ) : (
+        )}
+
+        {batchAssignments.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.emptyMessage}>No pending assignments</Text>
+            <View style={styles.sectionHeader}>
+              <Package size={20} color="#8b5cf6" />
+              <Text style={styles.sectionTitle}>Batch Delivery Assignments ({batchAssignments.length})</Text>
+            </View>
+            {batchAssignments.map((assignment) => (
+              <BatchAssignmentCard
+                key={assignment.id}
+                assignment={assignment}
+                onAccept={handleAcceptBatch}
+                onReject={handleRejectBatch}
+              />
+            ))}
           </View>
         )}
 
