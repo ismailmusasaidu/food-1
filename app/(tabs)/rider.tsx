@@ -777,15 +777,6 @@ export default function RiderDashboardScreen() {
           </View>
         </View>
 
-        {batchDeliveries.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Scheduled Batch Deliveries</Text>
-            {batchDeliveries.map((batch) => (
-              <BatchDeliveryCard key={batch.id} batch={batch} />
-            ))}
-          </View>
-        )}
-
         {activeOrders.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Active Deliveries ({activeOrders.length})</Text>
