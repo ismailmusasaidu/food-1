@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Calendar,
   Bike,
+  Trash2,
 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
@@ -120,6 +121,37 @@ export default function RouteManager({ onBack }: RouteManagerProps) {
       'Optimize Route',
       'This would use a route optimization algorithm to reorder stops for the most efficient delivery path.',
       [{ text: 'OK' }]
+    );
+  };
+
+  const deleteRoute = async (batchId: string) => {
+    Alert.alert(
+      'Delete Route',
+      'Are you sure you want to delete this batch delivery route? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from('batch_deliveries')
+                .delete()
+                .eq('id', batchId);
+
+              if (error) throw error;
+
+              Alert.alert('Success', 'Route deleted successfully');
+              setSelectedBatch(null);
+              fetchBatches();
+            } catch (error) {
+              console.error('Error deleting route:', error);
+              Alert.alert('Error', 'Failed to delete route');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -290,15 +322,25 @@ export default function RouteManager({ onBack }: RouteManagerProps) {
               </View>
             ))}
 
-          {selectedBatch.status === 'pending' && (
+          <View style={styles.actionButtons}>
+            {selectedBatch.status === 'pending' && (
+              <TouchableOpacity
+                style={styles.optimizeButton}
+                onPress={() => optimizeRoute(selectedBatch.id)}
+              >
+                <Navigation size={20} color="#fff" />
+                <Text style={styles.optimizeButtonText}>Optimize Route</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
-              style={styles.optimizeButton}
-              onPress={() => optimizeRoute(selectedBatch.id)}
+              style={styles.deleteButton}
+              onPress={() => deleteRoute(selectedBatch.id)}
             >
-              <Navigation size={20} color="#fff" />
-              <Text style={styles.optimizeButtonText}>Optimize Route</Text>
+              <Trash2 size={20} color="#fff" />
+              <Text style={styles.deleteButtonText}>Delete Route</Text>
             </TouchableOpacity>
-          )}
+          </View>
         </ScrollView>
       </View>
     );
@@ -685,6 +727,11 @@ const styles = StyleSheet.create({
     color: '#ff8c00',
     marginTop: 8,
   },
+  actionButtons: {
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 40,
+  },
   optimizeButton: {
     backgroundColor: '#ff8c00',
     borderRadius: 12,
@@ -693,10 +740,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    marginTop: 20,
-    marginBottom: 40,
   },
   optimizeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  deleteButton: {
+    backgroundColor: '#ef4444',
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
