@@ -9,7 +9,18 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon } from 'lucide-react-native';
+import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
@@ -40,10 +51,20 @@ export default function CheckoutScreen() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [mealTimePreference, setMealTimePreference] = useState<'breakfast' | 'lunch' | 'dinner' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'cash_on_delivery' | 'bank_transfer' | 'wallet' | 'paystack'>('cash_on_delivery');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+
+  const [fontsLoaded] = useFonts({
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
 
   useEffect(() => {
     fetchCartItems();
@@ -162,6 +183,8 @@ export default function CheckoutScreen() {
           is_scheduled: scheduleType === 'scheduled',
           scheduled_delivery_time: scheduledDeliveryTime,
           meal_time_preference: mealTimePreference,
+          payment_method: paymentMethod,
+          payment_status: paymentMethod === 'cash_on_delivery' ? 'pending' : 'pending',
         })
         .select()
         .single();
@@ -197,7 +220,7 @@ export default function CheckoutScreen() {
     }
   };
 
-  if (loading) {
+  if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#ff8c00" />
@@ -597,6 +620,85 @@ export default function CheckoutScreen() {
         )}
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <Text style={styles.helperText} style={{ marginBottom: 14 }}>
+            Choose how you'd like to pay for your order
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.paymentCard, paymentMethod === 'cash_on_delivery' && styles.paymentCardActive]}
+            onPress={() => setPaymentMethod('cash_on_delivery')}
+          >
+            <View style={[styles.paymentIcon, paymentMethod === 'cash_on_delivery' && styles.paymentIconActive]}>
+              <DollarSign size={24} color={paymentMethod === 'cash_on_delivery' ? '#ffffff' : '#ff8c00'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={styles.paymentTitle}>Cash On Delivery</Text>
+              <Text style={styles.paymentDescription}>Pay with cash when your order arrives</Text>
+            </View>
+            {paymentMethod === 'cash_on_delivery' && (
+              <View style={styles.paymentCheckmark}>
+                <CheckCircle size={20} color="#ff8c00" fill="#ff8c00" />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.paymentCard, paymentMethod === 'bank_transfer' && styles.paymentCardActive]}
+            onPress={() => setPaymentMethod('bank_transfer')}
+          >
+            <View style={[styles.paymentIcon, paymentMethod === 'bank_transfer' && styles.paymentIconActive]}>
+              <Building2 size={24} color={paymentMethod === 'bank_transfer' ? '#ffffff' : '#ff8c00'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={styles.paymentTitle}>Bank Transfer</Text>
+              <Text style={styles.paymentDescription}>Transfer to our bank account</Text>
+            </View>
+            {paymentMethod === 'bank_transfer' && (
+              <View style={styles.paymentCheckmark}>
+                <CheckCircle size={20} color="#ff8c00" fill="#ff8c00" />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.paymentCard, paymentMethod === 'wallet' && styles.paymentCardActive]}
+            onPress={() => setPaymentMethod('wallet')}
+          >
+            <View style={[styles.paymentIcon, paymentMethod === 'wallet' && styles.paymentIconActive]}>
+              <Wallet size={24} color={paymentMethod === 'wallet' ? '#ffffff' : '#ff8c00'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={styles.paymentTitle}>Wallet</Text>
+              <Text style={styles.paymentDescription}>Pay from your wallet balance</Text>
+            </View>
+            {paymentMethod === 'wallet' && (
+              <View style={styles.paymentCheckmark}>
+                <CheckCircle size={20} color="#ff8c00" fill="#ff8c00" />
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.paymentCard, paymentMethod === 'paystack' && styles.paymentCardActive]}
+            onPress={() => setPaymentMethod('paystack')}
+          >
+            <View style={[styles.paymentIcon, paymentMethod === 'paystack' && styles.paymentIconActive]}>
+              <CreditCard size={24} color={paymentMethod === 'paystack' ? '#ffffff' : '#ff8c00'} />
+            </View>
+            <View style={styles.paymentContent}>
+              <Text style={styles.paymentTitle}>Online Payment</Text>
+              <Text style={styles.paymentDescription}>Pay securely with card via Paystack</Text>
+            </View>
+            {paymentMethod === 'paystack' && (
+              <View style={styles.paymentCheckmark}>
+                <CheckCircle size={20} color="#ff8c00" fill="#ff8c00" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.summaryCard}>
             {cartItems.map((item) => (
@@ -672,6 +774,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
+    fontFamily: 'Inter-Medium',
     color: '#6b7280',
     marginBottom: 20,
   },
@@ -689,7 +792,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
   },
   header: {
     backgroundColor: '#ff8c00',
@@ -717,7 +820,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ffffff',
     letterSpacing: 0.5,
     flex: 1,
@@ -731,7 +834,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 19,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#1e293b',
     marginBottom: 14,
     letterSpacing: 0.3,
@@ -773,12 +876,13 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
     color: '#1f2937',
     marginBottom: 2,
   },
   optionDescription: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#6b7280',
   },
   selectedDot: {
@@ -850,22 +954,24 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#6b7280',
     flex: 1,
   },
   summaryPrice: {
     fontSize: 14,
+    fontFamily: 'Inter-Medium',
     color: '#1f2937',
-    fontWeight: '500',
   },
   summaryLabel: {
     fontSize: 16,
+    fontFamily: 'Inter-Medium',
     color: '#6b7280',
   },
   summaryValue: {
     fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
     color: '#1f2937',
-    fontWeight: '500',
   },
   divider: {
     height: 1,
@@ -874,12 +980,12 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#1f2937',
   },
   totalValue: {
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
     letterSpacing: 0.5,
   },
@@ -915,7 +1021,7 @@ const styles = StyleSheet.create({
   placeOrderButtonText: {
     color: '#ffffff',
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     letterSpacing: 0.5,
   },
   successContent: {
@@ -941,13 +1047,14 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     fontSize: 32,
-    fontWeight: '900',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     marginBottom: 12,
     letterSpacing: 0.5,
   },
   successMessage: {
     fontSize: 17,
+    fontFamily: 'Inter-Regular',
     color: '#64748b',
     textAlign: 'center',
     marginBottom: 32,
@@ -968,7 +1075,7 @@ const styles = StyleSheet.create({
   },
   orderDetailsTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     marginBottom: 20,
     letterSpacing: 0.3,
@@ -982,14 +1089,14 @@ const styles = StyleSheet.create({
   },
   orderDetailLabel: {
     fontSize: 15,
+    fontFamily: 'Inter-Medium',
     color: '#64748b',
-    fontWeight: '500',
     flex: 1,
   },
   orderDetailValue: {
     fontSize: 15,
+    fontFamily: 'Poppins-Bold',
     color: '#1e293b',
-    fontWeight: '700',
     textAlign: 'right',
     flex: 1,
   },
@@ -999,8 +1106,8 @@ const styles = StyleSheet.create({
   },
   orderTotalValue: {
     fontSize: 24,
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
-    fontWeight: '900',
     letterSpacing: 0.5,
   },
   timelineCard: {
@@ -1017,7 +1124,7 @@ const styles = StyleSheet.create({
   },
   timelineTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     marginBottom: 24,
     letterSpacing: 0.3,
@@ -1055,14 +1162,14 @@ const styles = StyleSheet.create({
   },
   timelineItemTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#1e293b',
     marginBottom: 4,
   },
   timelineItemTime: {
     fontSize: 14,
+    fontFamily: 'Inter-Medium',
     color: '#94a3b8',
-    fontWeight: '500',
   },
   buttonContainer: {
     width: '100%',
@@ -1083,7 +1190,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#ffffff',
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     letterSpacing: 0.5,
   },
   secondaryButton: {
@@ -1097,7 +1204,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#ff8c00',
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     letterSpacing: 0.5,
   },
   dateTimeContainer: {
@@ -1128,6 +1235,7 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 13,
+    fontFamily: 'Inter-Regular',
     color: '#6b7280',
     marginTop: 8,
     fontStyle: 'italic',
@@ -1157,7 +1265,7 @@ const styles = StyleSheet.create({
   },
   mealTimeOptionText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     letterSpacing: 0.3,
   },
@@ -1166,10 +1274,72 @@ const styles = StyleSheet.create({
   },
   mealTimeOptionTime: {
     fontSize: 10,
+    fontFamily: 'Inter-Medium',
     color: '#64748b',
-    fontWeight: '500',
   },
   mealTimeOptionTimeActive: {
     color: 'rgba(255, 255, 255, 0.85)',
+  },
+  paymentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 2.5,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  paymentCardActive: {
+    borderColor: '#ff8c00',
+    backgroundColor: '#fff7ed',
+    shadowColor: '#ff8c00',
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  paymentIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: '#fff7ed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#ffedd5',
+  },
+  paymentIconActive: {
+    backgroundColor: '#ff8c00',
+    borderColor: '#ff8c00',
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  paymentContent: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  paymentTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#1e293b',
+    marginBottom: 3,
+    letterSpacing: 0.2,
+  },
+  paymentDescription: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: '#64748b',
+    lineHeight: 18,
+  },
+  paymentCheckmark: {
+    marginLeft: 8,
   },
 });
