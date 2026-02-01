@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Vendor } from '@/types/database';
+import WalletCard from '@/components/WalletCard';
 
 export default function ProfileScreen() {
   const { profile, signOut, refreshProfile } = useAuth();
@@ -348,6 +349,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        <WalletCard />
 
         {profile?.role === 'vendor' && (
           <View style={styles.infoCard}>

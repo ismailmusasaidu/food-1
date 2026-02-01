@@ -203,6 +203,46 @@ export default function CheckoutScreen() {
 
       if (itemsError) throw itemsError;
 
+      if (paymentMethod === 'wallet') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) throw new Error('No session');
+
+          const response = await fetch(
+            `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/wallet-payment`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                order_id: orderData.id,
+                amount: total,
+                description: `Payment for order #${orderNumber}`,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Wallet payment failed');
+          }
+
+          const result = await response.json();
+          console.log('Wallet payment successful:', result);
+        } catch (walletError: any) {
+          console.error('Wallet payment error:', walletError);
+          await supabase
+            .from('orders')
+            .update({ payment_status: 'failed' })
+            .eq('id', orderData.id);
+
+          Alert.alert('Payment Failed', walletError.message || 'Failed to process wallet payment');
+          return;
+        }
+      }
+
       const { error: deleteError } = await supabase
         .from('carts')
         .delete()
