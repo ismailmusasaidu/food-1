@@ -17,6 +17,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log('=== Paystack Verify Function Started ===');
+    console.log('Request URL:', req.url);
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -25,13 +28,17 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const reference = url.searchParams.get('reference');
 
+    console.log('Payment Reference:', reference);
+
     if (!reference) {
+      console.error('Missing payment reference');
       return new Response(
         JSON.stringify({ error: 'Missing payment reference' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    console.log('Fetching transaction from Paystack...');
     const paystackResponse = await fetch(
       `https://api.paystack.co/transaction/verify/${reference}`,
       {
@@ -42,18 +49,24 @@ Deno.serve(async (req: Request) => {
       }
     );
 
+    console.log('Paystack response status:', paystackResponse.status);
+
     if (!paystackResponse.ok) {
       const errorData = await paystackResponse.json();
+      console.error('Paystack error:', errorData);
       throw new Error(errorData.message || 'Failed to verify payment');
     }
 
     const paystackData = await paystackResponse.json();
+    console.log('Paystack data received:', JSON.stringify(paystackData, null, 2));
 
     if (!paystackData.status || !paystackData.data) {
+      console.error('Invalid Paystack response structure');
       throw new Error('Invalid response from Paystack');
     }
 
     const transaction = paystackData.data;
+    console.log('Transaction status:', transaction.status);
 
     if (transaction.status !== 'success') {
       return new Response(
@@ -152,10 +165,15 @@ Deno.serve(async (req: Request) => {
     const orderData = transaction.metadata?.order_data;
     const orderItems = transaction.metadata?.order_items;
 
+    console.log('Order data from metadata:', orderData ? 'Found' : 'Missing');
+    console.log('Order items from metadata:', orderItems ? `Found (${orderItems.length} items)` : 'Missing');
+
     if (!orderData || !orderItems) {
+      console.error('Missing metadata - orderData:', !!orderData, 'orderItems:', !!orderItems);
       throw new Error('Order data not found in transaction metadata');
     }
 
+    console.log('Fetching vendor information...');
     // Fetch vendor user_id
     const { data: vendor, error: vendorError } = await supabaseClient
       .from('profiles')
@@ -167,6 +185,9 @@ Deno.serve(async (req: Request) => {
       console.error('Vendor fetch error:', vendorError);
       throw new Error('Failed to fetch vendor information');
     }
+
+    console.log('Vendor found:', vendor.id);
+    console.log('Creating order in database...');
 
     const { data: newOrder, error: orderError } = await supabaseClient
       .from('orders')
@@ -196,6 +217,9 @@ Deno.serve(async (req: Request) => {
       throw orderError;
     }
 
+    console.log('Order created successfully:', newOrder.id);
+
+    console.log('Inserting order items...');
     const orderItemsWithOrderId = orderItems.map((item: any) => ({
       ...item,
       order_id: newOrder.id,
@@ -205,14 +229,24 @@ Deno.serve(async (req: Request) => {
       .from('order_items')
       .insert(orderItemsWithOrderId);
 
-    if (itemsError) throw itemsError;
+    if (itemsError) {
+      console.error('Order items insertion error:', itemsError);
+      throw itemsError;
+    }
+
+    console.log('Order items inserted successfully');
+    console.log('Clearing cart for customer:', orderData.customer_id);
 
     const { error: deleteCartError } = await supabaseClient
       .from('carts')
       .delete()
       .eq('user_id', orderData.customer_id);
 
-    if (deleteCartError) console.error('Failed to clear cart:', deleteCartError);
+    if (deleteCartError) {
+      console.error('Failed to clear cart:', deleteCartError);
+    } else {
+      console.log('Cart cleared successfully');
+    }
 
     return new Response(
       `
