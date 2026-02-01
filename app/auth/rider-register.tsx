@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowLeft, Upload, Camera } from 'lucide-react-native';
@@ -484,13 +485,22 @@ export default function RiderRegisterScreen() {
         <View style={[styles.progress, { width: `${(currentStep / 3) * 100}%` }]} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {currentStep === 1 && renderStep1()}
+          {currentStep === 2 && renderStep2()}
+          {currentStep === 3 && renderStep3()}
 
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+          <View style={styles.bottomSpacer} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -532,6 +542,9 @@ const styles = StyleSheet.create({
   progress: {
     height: 4,
     backgroundColor: '#10b981',
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -639,6 +652,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   bottomSpacer: {
-    height: 32,
+    height: 80,
   },
 });
