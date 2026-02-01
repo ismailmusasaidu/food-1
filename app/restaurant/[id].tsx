@@ -12,6 +12,17 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Clock, Star, MapPin } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
 import { Product, Vendor } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +41,15 @@ export default function RestaurantDetail() {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  const [fontsLoaded] = useFonts({
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
 
   useEffect(() => {
     if (id) {
@@ -114,6 +134,10 @@ export default function RestaurantDetail() {
       console.error('Error adding to cart:', error);
     }
   };
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -334,6 +358,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
     color: '#64748b',
   },
   vendorHeader: {
@@ -356,18 +381,19 @@ const styles = StyleSheet.create({
   },
   vendorLogoText: {
     fontSize: 40,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#ffffff',
   },
   vendorName: {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1f2937',
     marginBottom: 8,
     textAlign: 'center',
   },
   vendorDescription: {
     fontSize: 15,
+    fontFamily: 'Inter-Regular',
     color: '#64748b',
     textAlign: 'center',
     marginBottom: 16,
@@ -385,7 +411,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
   },
   cuisineContainer: {
@@ -404,12 +430,12 @@ const styles = StyleSheet.create({
   },
   cuisineText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
     color: '#ff8c00',
   },
   minOrderText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
     marginTop: 8,
   },
@@ -422,7 +448,7 @@ const styles = StyleSheet.create({
   },
   closedText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#dc2626',
     textAlign: 'center',
   },
@@ -431,12 +457,13 @@ const styles = StyleSheet.create({
   },
   menuTitle: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1f2937',
     marginBottom: 16,
   },
   emptyText: {
     fontSize: 16,
+    fontFamily: 'Inter-Regular',
     color: '#94a3b8',
     textAlign: 'center',
     marginTop: 40,
@@ -469,7 +496,7 @@ const styles = StyleSheet.create({
   },
   productImageText: {
     fontSize: 48,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#94a3b8',
   },
   productInfo: {
@@ -477,12 +504,13 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#1f2937',
     marginBottom: 6,
   },
   productDescription: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#64748b',
     lineHeight: 20,
     marginBottom: 12,
@@ -495,7 +523,7 @@ const styles = StyleSheet.create({
   },
   productPrice: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
   },
   prepTimeContainer: {
@@ -506,8 +534,8 @@ const styles = StyleSheet.create({
   },
   prepTimeText: {
     fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
-    fontWeight: '600',
   },
   addButton: {
     backgroundColor: '#ff8c00',
@@ -517,7 +545,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#ffffff',
   },
   ratingContainer: {
@@ -528,11 +556,12 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
   },
   reviewCount: {
     fontSize: 12,
+    fontFamily: 'Inter-Regular',
     color: '#94a3b8',
   },
 });
