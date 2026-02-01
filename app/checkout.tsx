@@ -130,34 +130,59 @@ export default function CheckoutScreen() {
 
   const pollPaymentStatus = async (paymentReference: string, orderNum: string) => {
     let pollCount = 0;
-    const maxPolls = 60;
+    const maxPolls = 90; // 3 minutes total
     setWaitingForPayment(true);
+    const userId = profile?.id;
+    let pollInterval: NodeJS.Timeout | null = null;
 
-    const pollInterval = setInterval(async () => {
+    const checkPayment = async () => {
       try {
         pollCount++;
 
-        const { data: order, error } = await supabase
+        // Check if cart is empty (order was created and cart cleared)
+        const { data: cartData, error: cartError } = await supabase
+          .from('carts')
+          .select('id')
+          .eq('user_id', userId);
+
+        console.log('Polling attempt', pollCount, 'Cart items:', cartData?.length);
+
+        // If cart is empty, payment succeeded
+        if (cartData && cartData.length === 0) {
+          if (pollInterval) clearInterval(pollInterval);
+          setSubmitting(false);
+          setWaitingForPayment(false);
+          setOrderNumber(orderNum);
+          setOrderPlaced(true);
+          return true;
+        }
+
+        // Also try to find the order directly
+        const { data: order, error: orderError } = await supabase
           .from('orders')
-          .select('id, payment_status, status')
-          .eq('payment_reference', paymentReference)
-          .eq('customer_id', profile?.id)
+          .select('id, payment_status, status, order_number')
+          .eq('order_number', orderNum)
+          .eq('customer_id', userId)
           .maybeSingle();
 
+        console.log('Order check:', order, 'Error:', orderError);
+
         if (order && order.payment_status === 'completed') {
-          clearInterval(pollInterval);
+          if (pollInterval) clearInterval(pollInterval);
           setSubmitting(false);
           setWaitingForPayment(false);
 
+          // Clear cart
           await supabase
             .from('carts')
             .delete()
-            .eq('user_id', profile?.id);
+            .eq('user_id', userId);
 
           setOrderNumber(orderNum);
           setOrderPlaced(true);
+          return true;
         } else if (pollCount >= maxPolls) {
-          clearInterval(pollInterval);
+          if (pollInterval) clearInterval(pollInterval);
           setSubmitting(false);
           setWaitingForPayment(false);
 
@@ -175,14 +200,24 @@ export default function CheckoutScreen() {
               },
             ]
           );
+          return true;
         }
+        return false;
       } catch (error) {
         console.error('Error polling payment status:', error);
+        return false;
       }
-    }, 2000);
+    };
+
+    // Check immediately first
+    const immediateResult = await checkPayment();
+    if (immediateResult) return;
+
+    // Then poll every 2 seconds
+    pollInterval = setInterval(checkPayment, 2000);
 
     setTimeout(() => {
-      clearInterval(pollInterval);
+      if (pollInterval) clearInterval(pollInterval);
     }, maxPolls * 2000 + 1000);
   };
 
@@ -708,22 +743,43 @@ export default function CheckoutScreen() {
         <View style={styles.waitingOverlay}>
           <View style={styles.waitingCard}>
             <ActivityIndicator size="large" color="#ff8c00" />
-            <Text style={styles.waitingTitle}>Processing Payment</Text>
+            <Text style={styles.waitingTitle}>Waiting for Payment</Text>
             <Text style={styles.waitingMessage}>
-              Please complete the payment on Paystack and wait. We're monitoring your payment status.
+              Please complete the payment in the Paystack window that opened.
             </Text>
             <Text style={styles.waitingSubMessage}>
-              This may take up to 2 minutes...
+              After payment, we'll automatically detect it within a few seconds.
             </Text>
-            <TouchableOpacity
-              style={styles.cancelWaitingButton}
-              onPress={() => {
-                setWaitingForPayment(false);
-                setSubmitting(false);
-              }}
-            >
-              <Text style={styles.cancelWaitingButtonText}>Cancel & Return</Text>
-            </TouchableOpacity>
+            <View style={styles.waitingButtonsContainer}>
+              <TouchableOpacity
+                style={styles.checkNowButton}
+                onPress={async () => {
+                  // Manually trigger a check
+                  await fetchCartItems();
+                  const { data: cartData } = await supabase
+                    .from('carts')
+                    .select('id')
+                    .eq('user_id', profile?.id);
+
+                  if (cartData && cartData.length === 0) {
+                    setWaitingForPayment(false);
+                    setSubmitting(false);
+                    setOrderPlaced(true);
+                  }
+                }}
+              >
+                <Text style={styles.checkNowButtonText}>Check Status Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cancelWaitingButton}
+                onPress={() => {
+                  setWaitingForPayment(false);
+                  setSubmitting(false);
+                }}
+              >
+                <Text style={styles.cancelWaitingButtonText}>Cancel & Return</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -1864,6 +1920,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  waitingButtonsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  checkNowButton: {
+    backgroundColor: '#ff8c00',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    shadowColor: '#ff8c00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  checkNowButtonText: {
+    fontSize: 15,
+    fontFamily: 'Inter-Bold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
   cancelWaitingButton: {
     backgroundColor: '#f1f5f9',
     borderRadius: 12,
@@ -1876,5 +1953,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     color: '#64748b',
+    textAlign: 'center',
   },
 });
