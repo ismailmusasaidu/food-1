@@ -442,11 +442,9 @@ const styles = StyleSheet.create({
   },
   scheduledMealsSection: {
     backgroundColor: '#ffffff',
-    marginHorizontal: 20,
     marginTop: 8,
     marginBottom: 20,
     padding: 20,
-    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
