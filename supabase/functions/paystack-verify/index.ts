@@ -130,20 +130,43 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const orderId = transaction.metadata?.order_id;
-    if (!orderId) {
-      throw new Error('Order ID not found in transaction metadata');
+    const orderData = transaction.metadata?.order_data;
+    const orderItems = transaction.metadata?.order_items;
+
+    if (!orderData || !orderItems) {
+      throw new Error('Order data not found in transaction metadata');
     }
 
-    const { error: updateError } = await supabaseClient
+    const { data: newOrder, error: orderError } = await supabaseClient
       .from('orders')
-      .update({
+      .insert({
+        ...orderData,
+        status: 'pending',
         payment_status: 'completed',
         payment_reference: reference,
       })
-      .eq('id', orderId);
+      .select()
+      .single();
 
-    if (updateError) throw updateError;
+    if (orderError) throw orderError;
+
+    const orderItemsWithOrderId = orderItems.map((item: any) => ({
+      ...item,
+      order_id: newOrder.id,
+    }));
+
+    const { error: itemsError } = await supabaseClient
+      .from('order_items')
+      .insert(orderItemsWithOrderId);
+
+    if (itemsError) throw itemsError;
+
+    const { error: deleteCartError } = await supabaseClient
+      .from('carts')
+      .delete()
+      .eq('user_id', orderData.customer_id);
+
+    if (deleteCartError) console.error('Failed to clear cart:', deleteCartError);
 
     return new Response(
       `

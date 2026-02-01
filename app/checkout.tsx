@@ -211,41 +211,6 @@ export default function CheckoutScreen() {
         scheduledDeliveryTime = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
       }
 
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          customer_id: profile.id,
-          vendor_id: vendorId,
-          order_number: orderNumber,
-          subtotal: subtotal,
-          delivery_fee: deliveryFee,
-          total: total,
-          delivery_type: deliveryType,
-          delivery_address: deliveryType === 'delivery' ? `${deliveryName}\n${deliveryPhone}\n${deliveryAddress}` : 'N/A',
-          status: 'pending',
-          is_scheduled: scheduleType === 'scheduled',
-          scheduled_delivery_time: scheduledDeliveryTime,
-          meal_time_preference: mealTimePreference,
-          payment_method: paymentMethod,
-          payment_status: paymentMethod === 'cash_on_delivery' ? 'pending' : 'pending',
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const orderItems = cartItems.map((item) => ({
-        order_id: orderData.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.product.price,
-        subtotal: item.product.price * item.quantity,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-
-      if (itemsError) throw itemsError;
-
       if (paymentMethod === 'wallet') {
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -260,9 +225,28 @@ export default function CheckoutScreen() {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                order_id: orderData.id,
                 amount: total,
                 description: `Payment for order #${orderNumber}`,
+                order_data: {
+                  customer_id: profile.id,
+                  vendor_id: vendorId,
+                  order_number: orderNumber,
+                  subtotal: subtotal,
+                  delivery_fee: deliveryFee,
+                  total: total,
+                  delivery_type: deliveryType,
+                  delivery_address: deliveryType === 'delivery' ? `${deliveryName}\n${deliveryPhone}\n${deliveryAddress}` : 'N/A',
+                  is_scheduled: scheduleType === 'scheduled',
+                  scheduled_delivery_time: scheduledDeliveryTime,
+                  meal_time_preference: mealTimePreference,
+                  payment_method: paymentMethod,
+                },
+                order_items: cartItems.map((item) => ({
+                  product_id: item.product_id,
+                  quantity: item.quantity,
+                  unit_price: item.product.price,
+                  subtotal: item.product.price * item.quantity,
+                })),
               }),
             }
           );
@@ -273,16 +257,34 @@ export default function CheckoutScreen() {
           }
 
           const result = await response.json();
-          console.log('Wallet payment successful:', result);
+
+          await supabase
+            .from('carts')
+            .delete()
+            .eq('user_id', profile.id);
+
+          setOrderNumber(orderNumber);
+          setOrderPlaced(true);
+          return;
         } catch (walletError: any) {
           console.error('Wallet payment error:', walletError);
-          await supabase
-            .from('orders')
-            .update({ payment_status: 'failed' })
-            .eq('id', orderData.id);
-
-          Alert.alert('Payment Failed', walletError.message || 'Failed to process wallet payment');
+          Alert.alert(
+            'Payment Failed',
+            walletError.message || 'Failed to process wallet payment. Please try again.',
+            [
+              {
+                text: 'Retry',
+                onPress: () => handlePlaceOrder(),
+              },
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+            ]
+          );
           return;
+        } finally {
+          setSubmitting(false);
         }
       }
 
@@ -302,8 +304,27 @@ export default function CheckoutScreen() {
               body: JSON.stringify({
                 amount: total,
                 email: profile.email,
-                order_id: orderData.id,
                 order_number: orderNumber,
+                order_data: {
+                  customer_id: profile.id,
+                  vendor_id: vendorId,
+                  order_number: orderNumber,
+                  subtotal: subtotal,
+                  delivery_fee: deliveryFee,
+                  total: total,
+                  delivery_type: deliveryType,
+                  delivery_address: deliveryType === 'delivery' ? `${deliveryName}\n${deliveryPhone}\n${deliveryAddress}` : 'N/A',
+                  is_scheduled: scheduleType === 'scheduled',
+                  scheduled_delivery_time: scheduledDeliveryTime,
+                  meal_time_preference: mealTimePreference,
+                  payment_method: paymentMethod,
+                },
+                order_items: cartItems.map((item) => ({
+                  product_id: item.product_id,
+                  quantity: item.quantity,
+                  unit_price: item.product.price,
+                  subtotal: item.product.price * item.quantity,
+                })),
               }),
             }
           );
@@ -329,15 +350,60 @@ export default function CheckoutScreen() {
           return;
         } catch (paystackError: any) {
           console.error('Paystack payment error:', paystackError);
-          await supabase
-            .from('orders')
-            .update({ payment_status: 'failed' })
-            .eq('id', orderData.id);
-
-          Alert.alert('Payment Failed', paystackError.message || 'Failed to initialize payment');
+          Alert.alert(
+            'Payment Failed',
+            paystackError.message || 'Failed to initialize payment. Please try again.',
+            [
+              {
+                text: 'Retry',
+                onPress: () => handlePlaceOrder(),
+              },
+              {
+                text: 'Cancel',
+                style: 'cancel',
+              },
+            ]
+          );
           return;
+        } finally {
+          setSubmitting(false);
         }
       }
+
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          customer_id: profile.id,
+          vendor_id: vendorId,
+          order_number: orderNumber,
+          subtotal: subtotal,
+          delivery_fee: deliveryFee,
+          total: total,
+          delivery_type: deliveryType,
+          delivery_address: deliveryType === 'delivery' ? `${deliveryName}\n${deliveryPhone}\n${deliveryAddress}` : 'N/A',
+          status: 'pending',
+          is_scheduled: scheduleType === 'scheduled',
+          scheduled_delivery_time: scheduledDeliveryTime,
+          meal_time_preference: mealTimePreference,
+          payment_method: paymentMethod,
+          payment_status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItems = cartItems.map((item) => ({
+        order_id: orderData.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.product.price,
+        subtotal: item.product.price * item.quantity,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+
+      if (itemsError) throw itemsError;
 
       const { error: deleteError } = await supabase
         .from('carts')

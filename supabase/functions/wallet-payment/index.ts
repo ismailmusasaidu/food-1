@@ -38,9 +38,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { order_id, amount, description } = await req.json();
+    const { amount, description, order_data, order_items } = await req.json();
 
-    if (!order_id || !amount) {
+    if (!amount || !order_data || !order_items) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -86,31 +86,34 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: order } = await supabaseClient
-      .from('orders')
-      .select('*')
-      .eq('id', order_id)
-      .eq('customer_id', user.id)
-      .maybeSingle();
-
-    if (!order) {
-      return new Response(
-        JSON.stringify({ error: 'Order not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (order.payment_status === 'completed') {
-      return new Response(
-        JSON.stringify({ error: 'Order already paid' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const balanceBefore = currentBalance;
     const balanceAfter = currentBalance - amount;
 
     const transactionReference = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    const { data: newOrder, error: orderError } = await supabaseClient
+      .from('orders')
+      .insert({
+        ...order_data,
+        status: 'pending',
+        payment_status: 'completed',
+        payment_reference: transactionReference,
+      })
+      .select()
+      .single();
+
+    if (orderError) throw orderError;
+
+    const orderItemsWithOrderId = order_items.map((item: any) => ({
+      ...item,
+      order_id: newOrder.id,
+    }));
+
+    const { error: itemsError } = await supabaseClient
+      .from('order_items')
+      .insert(orderItemsWithOrderId);
+
+    if (itemsError) throw itemsError;
 
     const { error: transactionError } = await supabaseClient
       .from('wallet_transactions')
@@ -123,12 +126,12 @@ Deno.serve(async (req: Request) => {
         balance_after: balanceAfter,
         status: 'completed',
         reference: transactionReference,
-        description: description || `Payment for order #${order.order_number}`,
+        description: description || `Payment for order #${order_data.order_number}`,
         metadata: {
-          order_id: order_id,
-          order_number: order.order_number,
+          order_id: newOrder.id,
+          order_number: order_data.order_number,
         },
-        order_id: order_id,
+        order_id: newOrder.id,
         completed_at: new Date().toISOString(),
       });
 
@@ -140,16 +143,6 @@ Deno.serve(async (req: Request) => {
       .eq('id', wallet.id);
 
     if (walletError) throw walletError;
-
-    const { error: orderError } = await supabaseClient
-      .from('orders')
-      .update({
-        payment_status: 'completed',
-        payment_reference: transactionReference,
-      })
-      .eq('id', order_id);
-
-    if (orderError) throw orderError;
 
     return new Response(
       JSON.stringify({

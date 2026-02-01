@@ -40,9 +40,9 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { amount, email, order_id, order_number } = await req.json();
+    const { amount, email, order_number, order_data, order_items } = await req.json();
 
-    if (!amount || !email || !order_id) {
+    if (!amount || !email || !order_number || !order_data || !order_items) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -69,9 +69,10 @@ Deno.serve(async (req: Request) => {
         amount: Math.round(amount * 100),
         reference: reference,
         metadata: {
-          order_id: order_id,
           order_number: order_number,
           user_id: user.id,
+          order_data: order_data,
+          order_items: order_items,
         },
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/paystack-verify?reference=${reference}`,
       }),
@@ -83,15 +84,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const paystackData = await paystackResponse.json();
-
-    const { error: updateError } = await supabaseClient
-      .from('orders')
-      .update({
-        payment_reference: reference,
-      })
-      .eq('id', order_id);
-
-    if (updateError) throw updateError;
 
     return new Response(
       JSON.stringify({
