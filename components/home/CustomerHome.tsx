@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   mealTimesContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 16,
   },
   mealTimeCard: {
     flex: 1,
