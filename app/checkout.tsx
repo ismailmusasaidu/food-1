@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   Platform,
+  AppState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign, Copy } from 'lucide-react-native';
@@ -85,17 +86,15 @@ export default function CheckoutScreen() {
     fetchBankAccounts();
 
     // Listen for when user returns after payment
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && paymentMethod === 'paystack') {
-        // User came back to the tab, check if cart is empty (payment completed)
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && paymentMethod === 'paystack') {
+        // User came back to the app, check if cart is empty (payment completed)
         checkPaymentCompletion();
       }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    });
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      subscription.remove();
     };
   }, [paymentMethod]);
 
