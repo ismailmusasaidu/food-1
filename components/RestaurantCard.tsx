@@ -30,14 +30,9 @@ export default function RestaurantCard({ restaurant, onPress }: RestaurantCardPr
         )}
 
         {restaurant.cuisine_types && restaurant.cuisine_types.length > 0 && (
-          <View style={styles.cuisineContainer}>
-            {restaurant.cuisine_types.slice(0, 3).map((cuisine, index) => (
-              <Text key={index} style={styles.cuisineText}>
-                {cuisine}
-                {index < Math.min(restaurant.cuisine_types!.length - 1, 2) ? ' • ' : ''}
-              </Text>
-            ))}
-          </View>
+          <Text style={styles.cuisineText}>
+            {restaurant.cuisine_types.slice(0, 3).join(' • ')}
+          </Text>
         )}
 
         <View style={styles.metaContainer}>
@@ -123,15 +118,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 10,
   },
-  cuisineContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
   cuisineText: {
     fontSize: 13,
     color: '#ff8c00',
     fontWeight: '600',
+    marginBottom: 10,
   },
   metaContainer: {
     flexDirection: 'row',
