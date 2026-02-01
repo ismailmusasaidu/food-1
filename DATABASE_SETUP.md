@@ -1,231 +1,276 @@
 # Database Setup Instructions
 
-This file contains the SQL you need to run in your Supabase SQL Editor to set up the database for your food delivery app.
+This document describes the database schema for the food delivery platform. The schema has been set up through migrations in the `supabase/migrations/` directory.
 
-## How to Run This SQL
+## Database Overview
 
-1. Go to your Supabase Dashboard: https://supabase.com/dashboard
-2. Select your project
-3. Click on "SQL Editor" in the left sidebar
-4. Click "New Query"
-5. Copy and paste ALL the SQL below
-6. Click "Run" or press Ctrl+Enter
+The platform uses a multi-role system supporting:
+- **Customers** - Browse and order food
+- **Vendors** - Manage restaurants and menu items
+- **Riders** - Handle deliveries with batch assignment support
+- **Admins** - Platform management and oversight
 
-## SQL Schema
+## Core Tables
 
-```sql
--- Create enum types
-CREATE TYPE user_role AS ENUM ('customer', 'vendor', 'admin');
-CREATE TYPE order_status AS ENUM ('pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled');
+### User Management
 
--- Profiles table
-CREATE TABLE IF NOT EXISTS profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email text UNIQUE NOT NULL,
-  full_name text NOT NULL,
-  phone text,
-  avatar_url text,
-  role user_role DEFAULT 'customer' NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
-);
+#### profiles
+User profiles with role-based access control.
+- Supports multiple roles: customer, vendor, admin, rider
+- Vendor approval workflow (vendor_status: pending, approved, rejected)
+- Business information fields for vendor applications
+- User suspension capabilities (is_suspended, suspended_at, suspended_by)
 
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+#### riders
+Delivery rider profiles and verification.
+- Rider approval workflow (status: pending, approved, rejected, suspended)
+- Motorbike details and documentation (NIN, passport, license)
+- Next of kin information
+- Performance tracking (rating, deliveries, average delivery time)
+- Current status (available, busy, offline)
 
-CREATE POLICY "Users can view own profile" ON profiles FOR SELECT TO authenticated USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+#### rider_live_status
+Real-time rider availability and location tracking.
+- Current status and location
+- Last active timestamp
+- Used for assignment algorithms
 
--- Categories table
-CREATE TABLE IF NOT EXISTS categories (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text UNIQUE NOT NULL,
-  description text,
-  icon text,
-  display_order integer DEFAULT 0 NOT NULL,
-  is_active boolean DEFAULT true NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL
-);
+### Business Management
 
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+#### categories
+Product/food categories for organizing menu items.
+- Display order and active status
+- Icons for UI display
 
-CREATE POLICY "Anyone can view active categories" ON categories FOR SELECT TO authenticated USING (is_active = true);
-CREATE POLICY "Admins can manage categories" ON categories FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+#### vendors
+Restaurant/vendor business information.
+- Business details (name, description, logo, address)
+- Operating settings (hours, delivery radius, minimum order)
+- Verification and approval status
+- Performance metrics (rating, total sales)
+- Cuisine types and preparation times
+- Real-time availability (is_currently_open, is_accepting_orders)
 
--- Vendors table
-CREATE TABLE IF NOT EXISTS vendors (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  business_name text UNIQUE NOT NULL,
-  description text,
-  logo_url text,
-  address text NOT NULL,
-  city text NOT NULL,
-  state text NOT NULL,
-  postal_code text NOT NULL,
-  is_verified boolean DEFAULT false NOT NULL,
-  is_active boolean DEFAULT true NOT NULL,
-  rating decimal(3,2) DEFAULT 0 NOT NULL,
-  total_sales integer DEFAULT 0 NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
-);
+#### vendor_settings
+Extended vendor configuration.
+- Store hours, payment methods
+- Delivery settings
+- Social media links
+- Setup completion status
 
-ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
+#### vendor_hours
+Detailed operating hours per day of week.
+- Day-specific opening/closing times
+- Closed day tracking
 
-CREATE POLICY "Anyone can view active verified vendors" ON vendors FOR SELECT TO authenticated USING (is_active = true AND is_verified = true);
-CREATE POLICY "Vendors can view own vendor profile" ON vendors FOR SELECT TO authenticated USING (user_id = auth.uid());
-CREATE POLICY "Vendors can update own vendor profile" ON vendors FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Admins can manage vendors" ON vendors FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+### Products & Shopping
 
--- Products table
-CREATE TABLE IF NOT EXISTS products (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  vendor_id uuid REFERENCES vendors(id) ON DELETE CASCADE NOT NULL,
-  category_id uuid REFERENCES categories(id) NOT NULL,
-  name text NOT NULL,
-  description text,
-  image_url text,
-  price decimal(10,2) NOT NULL,
-  unit text DEFAULT 'piece' NOT NULL,
-  stock_quantity integer DEFAULT 0 NOT NULL,
-  is_available boolean DEFAULT true NOT NULL,
-  is_featured boolean DEFAULT false NOT NULL,
-  rating decimal(3,2) DEFAULT 0 NOT NULL,
-  total_reviews integer DEFAULT 0 NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
-);
+#### products
+Menu items with detailed information.
+- Pricing, stock, and availability
+- Preparation time
+- Dietary information (vegetarian, vegan, allergens)
+- Spice level (0-5)
+- Rating and review counts
 
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+#### product_images
+Multiple images per product.
+- Display order
+- Primary image designation
 
-CREATE POLICY "Anyone can view available products" ON products FOR SELECT TO authenticated USING (is_available = true AND stock_quantity > 0);
-CREATE POLICY "Vendors can manage own products" ON products FOR ALL TO authenticated USING (vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
-CREATE POLICY "Admins can manage all products" ON products FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+#### carts
+Shopping cart with real-time updates.
+- One cart item per user-product combination
+- Quantity tracking
 
--- Carts table
-CREATE TABLE IF NOT EXISTS carts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  product_id uuid REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-  quantity integer DEFAULT 1 NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  UNIQUE(user_id, product_id)
-);
+### Orders & Delivery
 
-ALTER TABLE carts ENABLE ROW LEVEL SECURITY;
+#### orders
+Customer orders with comprehensive tracking.
+- Order statuses: pending, confirmed, arrived_at_vendor, pickup_complete, arrived_at_customer, delivered, cancelled
+- Delivery types: pickup, delivery
+- Meal time preferences: breakfast, lunch, dinner
+- Pricing breakdown (subtotal, delivery fee, tax, total)
+- Rider assignment tracking
+- Timestamp tracking for each delivery stage
+- Scheduled delivery support
 
-CREATE POLICY "Users can manage own cart" ON carts FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+#### order_items
+Individual items within orders.
+- Product reference with snapshot pricing
+- Quantity and subtotal
 
--- Orders table
-CREATE TABLE IF NOT EXISTS orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  customer_id uuid REFERENCES profiles(id) NOT NULL,
-  vendor_id uuid REFERENCES vendors(id) NOT NULL,
-  order_number text UNIQUE NOT NULL,
-  status order_status DEFAULT 'pending' NOT NULL,
-  subtotal decimal(10,2) NOT NULL,
-  delivery_fee decimal(10,2) DEFAULT 0 NOT NULL,
-  tax decimal(10,2) DEFAULT 0 NOT NULL,
-  total decimal(10,2) NOT NULL,
-  delivery_address text NOT NULL,
-  notes text,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL
-);
+#### order_assignments
+Individual order assignments to riders.
+- Assignment workflow (pending, accepted, expired, cancelled)
+- Expiration timestamps
+- Acceptance tracking
 
-ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+#### batch_deliveries
+Batch delivery assignments for meal times.
+- Meal time grouping (breakfast, lunch, dinner)
+- Pickup and delivery windows
+- Status tracking (assigned, accepted, rejected, expired, pending, in_progress, completed, cancelled)
+- Multiple orders per batch
 
-CREATE POLICY "Customers can view own orders" ON orders FOR SELECT TO authenticated USING (customer_id = auth.uid());
-CREATE POLICY "Customers can create orders" ON orders FOR INSERT TO authenticated WITH CHECK (customer_id = auth.uid());
-CREATE POLICY "Vendors can view own orders" ON orders FOR SELECT TO authenticated USING (vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
-CREATE POLICY "Vendors can update own orders" ON orders FOR UPDATE TO authenticated USING (vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())) WITH CHECK (vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid()));
-CREATE POLICY "Admins can manage all orders" ON orders FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+#### batch_delivery_orders
+Links orders to batch deliveries.
+- Delivery sequence within batch
+- Individual delivery timestamps
 
--- Order items table
-CREATE TABLE IF NOT EXISTS order_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id uuid REFERENCES orders(id) ON DELETE CASCADE NOT NULL,
-  product_id uuid REFERENCES products(id) NOT NULL,
-  quantity integer NOT NULL,
-  unit_price decimal(10,2) NOT NULL,
-  subtotal decimal(10,2) NOT NULL,
-  created_at timestamptz DEFAULT now() NOT NULL
-);
+#### rider_deliveries
+Delivery tracking records.
+- Pickup and delivery locations
+- Status tracking (assigned, picked_up, in_transit, delivered, failed)
+- Customer ratings
+- Package count
 
-ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+#### rider_earnings
+Rider payment tracking.
+- Per-delivery earnings
+- Payment status (pending, paid)
+- Date tracking for payroll
 
-CREATE POLICY "Users can view own order items" ON order_items FOR SELECT TO authenticated USING (order_id IN (SELECT id FROM orders WHERE customer_id = auth.uid() OR vendor_id IN (SELECT id FROM vendors WHERE user_id = auth.uid())));
-CREATE POLICY "Customers can create order items" ON order_items FOR INSERT TO authenticated WITH CHECK (order_id IN (SELECT id FROM orders WHERE customer_id = auth.uid()));
-CREATE POLICY "Admins can manage all order items" ON order_items FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin'));
+#### delivery_issues
+Delivery problem reporting.
+- Issue types: customer_not_picking, address_not_found, refund_requested, other
+- Resolution tracking
+- Linked to specific orders and riders
 
--- Reviews table
-CREATE TABLE IF NOT EXISTS reviews (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  product_id uuid REFERENCES products(id) ON DELETE CASCADE NOT NULL,
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  order_id uuid REFERENCES orders(id),
-  rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
-  comment text,
-  created_at timestamptz DEFAULT now() NOT NULL,
-  updated_at timestamptz DEFAULT now() NOT NULL,
-  UNIQUE(product_id, user_id, order_id)
-);
+### Reviews & Communication
 
-ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+#### reviews
+Product reviews and ratings.
+- 1-5 star rating
+- Comment text
+- Linked to orders for verified purchases
+- Automatic product rating updates
 
-CREATE POLICY "Anyone can view reviews" ON reviews FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Users can create reviews for purchased products" ON reviews FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() AND order_id IN (SELECT id FROM orders WHERE customer_id = auth.uid()));
-CREATE POLICY "Users can update own reviews" ON reviews FOR UPDATE TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Users can delete own reviews" ON reviews FOR DELETE TO authenticated USING (user_id = auth.uid());
+#### notifications
+In-app notifications for all users.
+- Type, title, and message
+- Additional data as JSON
+- Read status tracking
 
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_products_vendor_id ON products(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
-CREATE INDEX IF NOT EXISTS idx_orders_vendor_id ON orders(vendor_id);
-CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
-CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
-CREATE INDEX IF NOT EXISTS idx_carts_user_id ON carts(user_id);
+## Order Status Flow
 
--- Insert default categories
-INSERT INTO categories (name, description, icon, display_order) VALUES
-  ('Groceries', 'Essential grocery items and pantry staples', 'shopping-cart', 1),
-  ('Fresh Meat', 'Premium quality fresh meat cuts', 'beef', 2),
-  ('Fresh Chicken', 'Farm fresh chicken products', 'drumstick', 3),
-  ('Fresh Fish', 'Ocean fresh fish and seafood', 'fish', 4),
-  ('Other', 'Additional products and items', 'package', 5)
-ON CONFLICT (name) DO NOTHING;
+The order progresses through these statuses:
+
+1. **pending** - Order created, awaiting vendor confirmation
+2. **confirmed** - Vendor accepted order, preparing food
+3. **arrived_at_vendor** - Rider arrived for pickup
+4. **pickup_complete** - Rider picked up order
+5. **arrived_at_customer** - Rider arrived at delivery location
+6. **delivered** - Order successfully delivered
+7. **cancelled** - Order cancelled (can happen at any stage)
+
+## Delivery Types
+
+### Pickup Orders
+Customer picks up directly from vendor. No rider assignment needed.
+
+### Delivery Orders
+Two assignment methods:
+
+1. **Individual Assignment** - Single order assigned to available rider
+2. **Batch Assignment** - Multiple orders grouped by meal time (breakfast, lunch, dinner) assigned to one rider
+
+## Security (Row Level Security)
+
+All tables have RLS enabled with policies enforcing:
+
+- **Customers** - Can only view and manage their own data (orders, cart, reviews)
+- **Vendors** - Can only manage their own restaurant, products, and related orders
+- **Riders** - Can only access assigned deliveries and their earnings
+- **Admins** - Full access for platform management
+
+## Real-time Features
+
+The following tables have real-time subscriptions enabled:
+- `orders` - Live order status updates
+- `carts` - Real-time cart synchronization
+- `notifications` - Instant notification delivery
+
+## Getting Started
+
+### For Development
+
+1. The database schema is managed through migrations in `supabase/migrations/`
+2. All migrations are automatically applied when you connect to the Supabase project
+3. The database is already set up and ready to use
+
+### Default Data
+
+The following default categories are pre-loaded:
+- Pizza, Burgers, Asian, Desserts, Beverages
+- Groceries, Fresh Meat, Fresh Chicken, Fresh Fish
+- Other (miscellaneous products)
+
+### Creating Users
+
+1. **Customer Account** - Register through the app (default role)
+2. **Vendor Account** - Register via vendor registration flow, requires admin approval
+3. **Rider Account** - Register via rider registration flow, requires admin approval and document verification
+4. **Admin Account** - Must be manually assigned in the database or by another admin
+
+### Vendor Approval Workflow
+
+1. Vendor registers with business information
+2. Profile has `vendor_status: 'pending'`
+3. Admin reviews application in admin panel
+4. Admin approves (`vendor_status: 'approved'`) or rejects with reason
+5. Approved vendors can create vendor profile and add products
+
+### Rider Approval Workflow
+
+1. Rider registers with personal details, NIN, motorbike info, and documents
+2. Rider has `status: 'pending'`
+3. Admin reviews application and documents
+4. Admin approves (`status: 'approved'`) or rejects
+5. Approved riders can go online and accept deliveries
+
+## Database Relationships
+
+```
+profiles (auth.users)
+├── vendors (one-to-one for vendor role)
+│   ├── products (one-to-many)
+│   │   ├── product_images (one-to-many)
+│   │   └── reviews (one-to-many)
+│   ├── vendor_settings (one-to-one)
+│   ├── vendor_hours (one-to-many)
+│   └── orders as vendor (one-to-many)
+├── riders (one-to-one for rider role)
+│   ├── rider_live_status (one-to-one)
+│   ├── order_assignments (one-to-many)
+│   ├── batch_deliveries (one-to-many)
+│   ├── rider_deliveries (one-to-many)
+│   └── rider_earnings (one-to-many)
+├── orders as customer (one-to-many)
+│   ├── order_items (one-to-many)
+│   └── reviews (one-to-many)
+├── carts (one-to-many)
+└── notifications (one-to-many)
+
+categories
+└── products (one-to-many)
 ```
 
-## After Running the SQL
+## Performance Indexes
 
-The database is now set up! You can:
+Indexes are created on frequently queried columns:
+- Profile roles and status fields
+- Product vendor and category foreign keys
+- Order customer, vendor, rider, and status fields
+- Cart user references
+- Rider status and user references
+- Notifications user references
+- Assignment and delivery rider references
 
-1. Register a new account in the app (defaults to 'customer' role)
-2. To create admin or vendor accounts, update the role in the Supabase Table Editor:
-   - Go to "Table Editor" > "profiles"
-   - Find the user and change their "role" field
+## Notes
 
-## Next Steps
-
-To add sample data (restaurants and menu items), you'll need to:
-
-1. Create a vendor profile in the profiles table with role='vendor'
-2. Add a restaurant entry in the vendors table with:
-   - Business information
-   - Operating hours (opening/closing times)
-   - Cuisine types
-   - Average preparation time
-   - Delivery radius
-3. Add menu items in the products table linked to that restaurant
-
-The app now includes:
-- Restaurant registration with operating hours
-- Menu items with preparation times
-- Delivery radius settings
-- Real-time availability tracking
-- Food categories (Pizza, Burgers, Asian, etc.)
-
-Enjoy your food delivery app!
+- All timestamps use `timestamptz` for proper timezone handling
+- Numeric fields for money use `numeric(10,2)` for precision
+- JSONB fields store complex data (operating hours, motorbike details, etc.)
+- Enums enforce valid values for roles, statuses, and types
+- Foreign key constraints maintain referential integrity with CASCADE deletes where appropriate
