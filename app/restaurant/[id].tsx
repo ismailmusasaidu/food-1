@@ -131,6 +131,12 @@ export default function RestaurantDetail() {
     );
   }
 
+  const businessName = vendor.business_name || 'Restaurant';
+  const firstLetter = businessName.charAt(0).toUpperCase();
+  const rating = Number(vendor.rating) || 0;
+  const minOrder = Number(vendor.minimum_order) || 0;
+  const city = String(vendor.city || '');
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
@@ -148,11 +154,11 @@ export default function RestaurantDetail() {
             <Image source={{ uri: vendor.logo_url }} style={styles.vendorLogo} />
           ) : (
             <View style={[styles.vendorLogo, styles.vendorLogoPlaceholder]}>
-              <Text style={styles.vendorLogoText}>{vendor.business_name[0]}</Text>
+              <Text style={styles.vendorLogoText}>{firstLetter}</Text>
             </View>
           )}
 
-          <Text style={styles.vendorName}>{vendor.business_name}</Text>
+          <Text style={styles.vendorName}>{businessName}</Text>
 
           {vendor.description && (
             <Text style={styles.vendorDescription}>{vendor.description}</Text>
@@ -161,7 +167,7 @@ export default function RestaurantDetail() {
           <View style={styles.vendorMeta}>
             <View style={styles.metaItem}>
               <Star size={16} color="#fbbf24" fill="#fbbf24" />
-              <Text style={styles.metaText}>{(vendor.rating || 0).toFixed(1)}</Text>
+              <Text style={styles.metaText}>{rating.toFixed(1)}</Text>
             </View>
 
             {vendor.average_preparation_time && (
@@ -171,10 +177,10 @@ export default function RestaurantDetail() {
               </View>
             )}
 
-            {vendor.address && (
+            {city && (
               <View style={styles.metaItem}>
                 <MapPin size={16} color="#64748b" />
-                <Text style={styles.metaText}>{vendor.city}</Text>
+                <Text style={styles.metaText}>{city}</Text>
               </View>
             )}
           </View>
@@ -189,9 +195,9 @@ export default function RestaurantDetail() {
             </View>
           )}
 
-          {vendor.minimum_order && vendor.minimum_order > 0 && (
+          {minOrder > 0 && (
             <Text style={styles.minOrderText}>
-              Minimum order: ${(vendor.minimum_order || 0).toFixed(2)}
+              Minimum order: ${minOrder.toFixed(2)}
             </Text>
           )}
 
@@ -209,64 +215,72 @@ export default function RestaurantDetail() {
             <Text style={styles.emptyText}>No menu items available</Text>
           ) : (
             <View style={styles.productsGrid}>
-              {products.map((item, index) => (
-                <View key={item.id} style={styles.productWrapper}>
-                  <TouchableOpacity
-                    style={styles.productItem}
-                    onPress={() => openProductDetail(item)}
-                  >
-                    {item.image_url ? (
-                      <Image source={{ uri: item.image_url }} style={styles.productImage} />
-                    ) : (
-                      <View style={[styles.productImage, styles.productImagePlaceholder]}>
-                        <Text style={styles.productImageText}>{item.name[0]}</Text>
-                      </View>
-                    )}
+              {products.map((item, index) => {
+                const productName = item.name || 'Product';
+                const productFirstLetter = productName.charAt(0).toUpperCase();
+                const productPrice = Number(item.price) || 0;
+                const productRating = Number(item.rating) || 0;
+                const totalReviews = Number(item.total_reviews) || 0;
 
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productName}>{item.name}</Text>
-
-                      {item.description && (
-                        <Text style={styles.productDescription} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                      )}
-
-                      <View style={styles.productFooter}>
-                        <View>
-                          <Text style={styles.productPrice}>${(item.price || 0).toFixed(2)}</Text>
-                          {item.preparation_time && (
-                            <View style={styles.prepTimeContainer}>
-                              <Clock size={12} color="#64748b" />
-                              <Text style={styles.prepTimeText}>{String(item.preparation_time)} min</Text>
-                            </View>
-                          )}
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.addButton}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            addToCart(item.id, e);
-                          }}
-                        >
-                          <Text style={styles.addButtonText}>Add</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {item.rating > 0 && (
-                        <View style={styles.ratingContainer}>
-                          <Star size={12} color="#fbbf24" fill="#fbbf24" />
-                          <Text style={styles.ratingText}>{(item.rating || 0).toFixed(1)}</Text>
-                          {item.total_reviews > 0 && (
-                            <Text style={styles.reviewCount}>({String(item.total_reviews)})</Text>
-                          )}
+                return (
+                  <View key={item.id} style={styles.productWrapper}>
+                    <TouchableOpacity
+                      style={styles.productItem}
+                      onPress={() => openProductDetail(item)}
+                    >
+                      {item.image_url ? (
+                        <Image source={{ uri: item.image_url }} style={styles.productImage} />
+                      ) : (
+                        <View style={[styles.productImage, styles.productImagePlaceholder]}>
+                          <Text style={styles.productImageText}>{productFirstLetter}</Text>
                         </View>
                       )}
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              ))}
+
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName}>{productName}</Text>
+
+                        {item.description && (
+                          <Text style={styles.productDescription} numberOfLines={2}>
+                            {item.description}
+                          </Text>
+                        )}
+
+                        <View style={styles.productFooter}>
+                          <View>
+                            <Text style={styles.productPrice}>${productPrice.toFixed(2)}</Text>
+                            {item.preparation_time && (
+                              <View style={styles.prepTimeContainer}>
+                                <Clock size={12} color="#64748b" />
+                                <Text style={styles.prepTimeText}>{String(item.preparation_time)} min</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              addToCart(item.id, e);
+                            }}
+                          >
+                            <Text style={styles.addButtonText}>Add</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {productRating > 0 && (
+                          <View style={styles.ratingContainer}>
+                            <Star size={12} color="#fbbf24" fill="#fbbf24" />
+                            <Text style={styles.ratingText}>{productRating.toFixed(1)}</Text>
+                            {totalReviews > 0 && (
+                              <Text style={styles.reviewCount}>({totalReviews})</Text>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
