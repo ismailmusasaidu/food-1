@@ -8,6 +8,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign } from 'lucide-react-native';
 import { useFonts } from 'expo-font';
@@ -239,6 +241,59 @@ export default function CheckoutScreen() {
             .eq('id', orderData.id);
 
           Alert.alert('Payment Failed', walletError.message || 'Failed to process wallet payment');
+          return;
+        }
+      }
+
+      if (paymentMethod === 'paystack') {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) throw new Error('No session');
+
+          const response = await fetch(
+            `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/paystack-initialize`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                amount: total,
+                email: profile.email,
+                order_id: orderData.id,
+                order_number: orderNumber,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to initialize payment');
+          }
+
+          const result = await response.json();
+
+          const canOpen = await Linking.canOpenURL(result.authorization_url);
+          if (canOpen) {
+            await Linking.openURL(result.authorization_url);
+          } else {
+            throw new Error('Cannot open payment URL');
+          }
+
+          if (Platform.OS === 'web') {
+            alert('You will be redirected to complete payment. Please complete the payment and return to the app.');
+          }
+
+          return;
+        } catch (paystackError: any) {
+          console.error('Paystack payment error:', paystackError);
+          await supabase
+            .from('orders')
+            .update({ payment_status: 'failed' })
+            .eq('id', orderData.id);
+
+          Alert.alert('Payment Failed', paystackError.message || 'Failed to initialize payment');
           return;
         }
       }
