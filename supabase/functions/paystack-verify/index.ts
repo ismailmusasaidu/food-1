@@ -137,10 +137,34 @@ Deno.serve(async (req: Request) => {
       throw new Error('Order data not found in transaction metadata');
     }
 
+    // Fetch vendor user_id
+    const { data: vendor, error: vendorError } = await supabaseClient
+      .from('profiles')
+      .select('id, user_id')
+      .eq('id', orderData.vendor_id)
+      .single();
+
+    if (vendorError || !vendor) {
+      console.error('Vendor fetch error:', vendorError);
+      throw new Error('Failed to fetch vendor information');
+    }
+
     const { data: newOrder, error: orderError } = await supabaseClient
       .from('orders')
       .insert({
-        ...orderData,
+        customer_id: orderData.customer_id,
+        vendor_id: orderData.vendor_id,
+        vendor_user_id: vendor.user_id,
+        order_number: orderData.order_number,
+        subtotal: orderData.subtotal,
+        delivery_fee: orderData.delivery_fee,
+        total: orderData.total,
+        delivery_type: orderData.delivery_type,
+        delivery_address: orderData.delivery_address,
+        is_scheduled: orderData.is_scheduled,
+        scheduled_delivery_time: orderData.scheduled_delivery_time,
+        meal_time_preference: orderData.meal_time_preference,
+        payment_method: orderData.payment_method,
         status: 'pending',
         payment_status: 'completed',
         payment_reference: reference,
@@ -148,7 +172,10 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (orderError) throw orderError;
+    if (orderError) {
+      console.error('Order creation error:', orderError);
+      throw orderError;
+    }
 
     const orderItemsWithOrderId = orderItems.map((item: any) => ({
       ...item,
