@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   },
   scheduledMealsSection: {
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     marginTop: 8,
     marginBottom: 20,
     padding: 20,
