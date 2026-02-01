@@ -11,7 +11,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign } from 'lucide-react-native';
+import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign, Copy } from 'lucide-react-native';
 import { useFonts } from 'expo-font';
 import {
   Poppins_600SemiBold,
@@ -40,6 +40,15 @@ interface CartItemWithProduct {
   };
 }
 
+interface BankAccount {
+  id: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  is_active: boolean;
+  display_order: number;
+}
+
 const DELIVERY_FEE = 5.0;
 
 export default function CheckoutScreen() {
@@ -58,6 +67,7 @@ export default function CheckoutScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
 
   const [fontsLoaded] = useFonts({
     'Poppins-SemiBold': Poppins_600SemiBold,
@@ -70,6 +80,7 @@ export default function CheckoutScreen() {
 
   useEffect(() => {
     fetchCartItems();
+    fetchBankAccounts();
   }, []);
 
   const fetchCartItems = async () => {
@@ -110,6 +121,34 @@ export default function CheckoutScreen() {
       Alert.alert('Error', 'Failed to load cart items');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBankAccounts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setBankAccounts(data || []);
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+    }
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    if (Platform.OS === 'web') {
+      try {
+        await navigator.clipboard.writeText(text);
+        Alert.alert('Copied', `${label} copied to clipboard`);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to copy to clipboard');
+      }
+    } else {
+      Alert.alert('Info', `${label}: ${text}`);
     }
   };
 
@@ -755,6 +794,48 @@ export default function CheckoutScreen() {
               </View>
             )}
           </TouchableOpacity>
+
+          {paymentMethod === 'bank_transfer' && bankAccounts.length > 0 && (
+            <View style={styles.bankAccountsContainer}>
+              <Text style={styles.bankAccountsTitle}>Transfer to any of these accounts</Text>
+              {bankAccounts.map((account) => (
+                <View key={account.id} style={styles.bankAccountCard}>
+                  <Text style={styles.bankAccountName}>{account.bank_name}</Text>
+
+                  <View style={styles.bankDetailRow}>
+                    <View style={styles.bankDetailContent}>
+                      <Text style={styles.bankDetailLabel}>Account Number</Text>
+                      <Text style={styles.bankDetailValue}>{account.account_number}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={() => copyToClipboard(account.account_number, 'Account number')}
+                    >
+                      <Copy size={16} color="#ff8c00" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.bankDetailRow}>
+                    <View style={styles.bankDetailContent}>
+                      <Text style={styles.bankDetailLabel}>Account Name</Text>
+                      <Text style={styles.bankDetailValue}>{account.account_name}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.copyButton}
+                      onPress={() => copyToClipboard(account.account_name, 'Account name')}
+                    >
+                      <Copy size={16} color="#ff8c00" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              <View style={styles.bankTransferNote}>
+                <Text style={styles.bankTransferNoteText}>
+                  Please transfer the exact amount and your order will be confirmed after payment verification.
+                </Text>
+              </View>
+            </View>
+          )}
 
           <TouchableOpacity
             style={[styles.paymentCard, paymentMethod === 'wallet' && styles.paymentCardActive]}
@@ -1436,5 +1517,68 @@ const styles = StyleSheet.create({
   },
   paymentCheckmark: {
     marginLeft: 8,
+  },
+  bankAccountsContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  bankAccountsTitle: {
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1e293b',
+    marginBottom: 4,
+  },
+  bankAccountCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  bankAccountName: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#ff8c00',
+    marginBottom: 12,
+  },
+  bankDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bankDetailContent: {
+    flex: 1,
+  },
+  bankDetailLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: '#64748b',
+    marginBottom: 4,
+  },
+  bankDetailValue: {
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#1e293b',
+  },
+  copyButton: {
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ff8c00',
+  },
+  bankTransferNote: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#f59e0b',
+  },
+  bankTransferNoteText: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: '#92400e',
+    lineHeight: 18,
   },
 });

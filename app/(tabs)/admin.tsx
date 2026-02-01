@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, FileText, Bike, Navigation, Map } from 'lucide-react-native';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, FileText, Bike, Navigation, Map, Building2 } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import VendorManagement from '@/components/admin/VendorManagement';
 import OrderManagement from '@/components/admin/OrderManagement';
@@ -17,6 +17,7 @@ import ContentManagement from '@/components/admin/ContentManagement';
 import RiderManagement from '@/components/admin/RiderManagement';
 import RiderAssignmentManager from '@/components/admin/RiderAssignmentManager';
 import RouteManager from '@/components/admin/RouteManager';
+import BankAccountManagement from '@/components/admin/BankAccountManagement';
 import { useLocalSearchParams } from 'expo-router';
 
 interface Stats {
@@ -47,6 +48,7 @@ export default function AdminScreen() {
   const [showRiderManagement, setShowRiderManagement] = useState(false);
   const [showRiderAssignment, setShowRiderAssignment] = useState(false);
   const [showRouteManager, setShowRouteManager] = useState(false);
+  const [showBankAccountManagement, setShowBankAccountManagement] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -174,6 +176,21 @@ export default function AdminScreen() {
 
   if (showRouteManager) {
     return <RouteManager onBack={() => setShowRouteManager(false)} />;
+  }
+
+  if (showBankAccountManagement) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setShowBankAccountManagement(false)} style={styles.backButton}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.content}>
+          <BankAccountManagement />
+        </View>
+      </View>
+    );
   }
 
   if (loading) {
@@ -313,6 +330,14 @@ export default function AdminScreen() {
             <FileText size={20} color="#6b7280" />
             <Text style={styles.menuText}>Manage Content</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => setShowBankAccountManagement(true)}
+          >
+            <Building2 size={20} color="#6b7280" />
+            <Text style={styles.menuText}>Bank Accounts</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
@@ -429,5 +454,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
     fontWeight: '500',
+  },
+  backButton: {
+    paddingVertical: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '600',
   },
 });
