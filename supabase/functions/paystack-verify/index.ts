@@ -109,6 +109,11 @@ Deno.serve(async (req: Request) => {
               text-decoration: none;
               font-weight: 600;
             }
+            .countdown {
+              font-size: 14px;
+              color: #9ca3af;
+              margin-top: 16px;
+            }
           </style>
         </head>
         <body>
@@ -116,8 +121,22 @@ Deno.serve(async (req: Request) => {
             <div class="icon">❌</div>
             <h1>Payment Failed</h1>
             <p>Your payment was not successful. Please try again.</p>
+            <p>Transaction Status: ${transaction.status}</p>
             <a href="/" class="button">Return to App</a>
+            <p class="countdown">Redirecting in <span id="countdown">5</span> seconds...</p>
           </div>
+          <script>
+            let seconds = 5;
+            const countdownEl = document.getElementById('countdown');
+            const interval = setInterval(() => {
+              seconds--;
+              if (countdownEl) countdownEl.textContent = seconds.toString();
+              if (seconds <= 0) {
+                clearInterval(interval);
+                window.location.href = '/checkout';
+              }
+            }, 1000);
+          </script>
         </body>
         </html>
         `,

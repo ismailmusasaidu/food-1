@@ -71,6 +71,7 @@ export default function CheckoutScreen() {
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [orderNumber, setOrderNumber] = useState('');
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
 
   const [fontsLoaded] = useFonts({
     'Poppins-SemiBold': Poppins_600SemiBold,
@@ -125,6 +126,64 @@ export default function CheckoutScreen() {
     } catch (error) {
       console.error('Error checking payment completion:', error);
     }
+  };
+
+  const pollPaymentStatus = async (paymentReference: string, orderNum: string) => {
+    let pollCount = 0;
+    const maxPolls = 60;
+    setWaitingForPayment(true);
+
+    const pollInterval = setInterval(async () => {
+      try {
+        pollCount++;
+
+        const { data: order, error } = await supabase
+          .from('orders')
+          .select('id, payment_status, status')
+          .eq('payment_reference', paymentReference)
+          .eq('customer_id', profile?.id)
+          .maybeSingle();
+
+        if (order && order.payment_status === 'completed') {
+          clearInterval(pollInterval);
+          setSubmitting(false);
+          setWaitingForPayment(false);
+
+          await supabase
+            .from('carts')
+            .delete()
+            .eq('user_id', profile?.id);
+
+          setOrderNumber(orderNum);
+          setOrderPlaced(true);
+        } else if (pollCount >= maxPolls) {
+          clearInterval(pollInterval);
+          setSubmitting(false);
+          setWaitingForPayment(false);
+
+          Alert.alert(
+            'Payment Status Unknown',
+            'We are still processing your payment. Please check your orders in a few minutes. If you completed the payment, your order will appear shortly.',
+            [
+              {
+                text: 'View Orders',
+                onPress: () => router.replace('/(tabs)/orders'),
+              },
+              {
+                text: 'Stay Here',
+                style: 'cancel',
+              },
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Error polling payment status:', error);
+      }
+    }, 2000);
+
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, maxPolls * 2000 + 1000);
   };
 
   const fetchCartItems = async () => {
@@ -389,6 +448,8 @@ export default function CheckoutScreen() {
             alert('You will be redirected to complete payment. Please complete the payment and return to the app.');
           }
 
+          pollPaymentStatus(result.reference, orderNumber);
+
           return;
         } catch (paystackError: any) {
           console.error('Paystack payment error:', paystackError);
@@ -406,9 +467,8 @@ export default function CheckoutScreen() {
               },
             ]
           );
-          return;
-        } finally {
           setSubmitting(false);
+          return;
         }
       }
 
@@ -638,6 +698,34 @@ export default function CheckoutScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (waitingForPayment) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.waitingOverlay}>
+          <View style={styles.waitingCard}>
+            <ActivityIndicator size="large" color="#ff8c00" />
+            <Text style={styles.waitingTitle}>Processing Payment</Text>
+            <Text style={styles.waitingMessage}>
+              Please complete the payment on Paystack and wait. We're monitoring your payment status.
+            </Text>
+            <Text style={styles.waitingSubMessage}>
+              This may take up to 2 minutes...
+            </Text>
+            <TouchableOpacity
+              style={styles.cancelWaitingButton}
+              onPress={() => {
+                setWaitingForPayment(false);
+                setSubmitting(false);
+              }}
+            >
+              <Text style={styles.cancelWaitingButtonText}>Cancel & Return</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     );
   }
@@ -1732,5 +1820,61 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#ff8c00',
     fontSize: 15,
+  },
+  waitingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 20,
+  },
+  waitingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 32,
+    alignItems: 'center',
+    maxWidth: 400,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  waitingTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#1e293b',
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  waitingMessage: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  waitingSubMessage: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  cancelWaitingButton: {
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  cancelWaitingButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#64748b',
   },
 });
