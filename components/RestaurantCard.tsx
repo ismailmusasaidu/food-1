@@ -19,7 +19,7 @@ interface RestaurantCardProps {
 }
 
 export default function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'Poppins-SemiBold': Poppins_600SemiBold,
     'Poppins-Bold': Poppins_700Bold,
     'Poppins-ExtraBold': Poppins_800ExtraBold,
@@ -33,8 +33,8 @@ export default function RestaurantCard({ restaurant, onPress }: RestaurantCardPr
   const rating = Number(restaurant.rating) || 0;
   const minOrder = Number(restaurant.minimum_order) || 0;
 
-  if (!fontsLoaded) {
-    return null;
+  if (fontError) {
+    console.error('RestaurantCard font error:', fontError);
   }
 
   return (
@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 64,
     fontFamily: 'Poppins-ExtraBold',
+    fontWeight: '800',
     color: '#ffffff',
   },
   content: {
@@ -138,12 +139,14 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 20,
     fontFamily: 'Poppins-ExtraBold',
+    fontWeight: '800',
     color: '#1f2937',
     marginBottom: 6,
   },
   description: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
+    fontWeight: '400',
     color: '#64748b',
     lineHeight: 20,
     marginBottom: 10,
@@ -151,6 +154,7 @@ const styles = StyleSheet.create({
   cuisineText: {
     fontSize: 13,
     fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
     color: '#ff8c00',
     marginBottom: 10,
   },
@@ -167,11 +171,13 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 13,
     fontFamily: 'Inter-SemiBold',
+    fontWeight: '600',
     color: '#64748b',
   },
   minOrder: {
     fontSize: 12,
     fontFamily: 'Inter-Medium',
+    fontWeight: '500',
     color: '#94a3b8',
     marginTop: 4,
   },
@@ -187,6 +193,7 @@ const styles = StyleSheet.create({
   closedText: {
     fontSize: 12,
     fontFamily: 'Poppins-Bold',
+    fontWeight: '700',
     color: '#dc2626',
   },
 });

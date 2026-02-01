@@ -40,8 +40,9 @@ export default function CustomerHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedMealTime, setSelectedMealTime] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     'Poppins-Regular': Poppins_400Regular,
     'Poppins-Medium': Poppins_500Medium,
     'Poppins-SemiBold': Poppins_600SemiBold,
@@ -88,16 +89,23 @@ export default function CustomerHome() {
         .eq('is_active', true)
         .order('display_order');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Categories fetch error:', error);
+        setError(`Failed to load categories: ${error.message}`);
+        return;
+      }
       setCategories(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching categories:', error);
+      setError(`Error: ${error?.message || 'Unknown error'}`);
     }
   };
 
   const fetchRestaurants = async () => {
     try {
       setLoading(true);
+      setError(null);
+
       let query = supabase
         .from('vendors')
         .select('*')
@@ -106,10 +114,17 @@ export default function CustomerHome() {
 
       const { data, error } = await query.order('rating', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Restaurants fetch error:', error);
+        setError(`Failed to load restaurants: ${error.message}`);
+        return;
+      }
+
+      console.log('Restaurants loaded:', data?.length || 0);
       setRestaurants(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching restaurants:', error);
+      setError(`Error: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -305,8 +320,17 @@ export default function CustomerHome() {
     </>
   );
 
-  if (!fontsLoaded) {
-    return null;
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#ff8c00" />
+        <Text style={{ marginTop: 16, fontSize: 14, color: '#64748b' }}>Loading fonts...</Text>
+      </View>
+    );
+  }
+
+  if (fontError) {
+    console.error('Font loading error:', fontError);
   }
 
   if (loading) {
@@ -315,6 +339,20 @@ export default function CustomerHome() {
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#ff8c00" />
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        {renderHeader()}
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchRestaurants} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -354,6 +392,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 28,
     fontFamily: 'Poppins-ExtraBold',
+    fontWeight: '800',
     color: '#ffffff',
     marginBottom: 6,
     letterSpacing: 0.5,
@@ -361,6 +400,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     fontFamily: 'Inter-Medium',
+    fontWeight: '500',
     color: '#e0f2fe',
     marginBottom: 20,
   },
@@ -539,5 +579,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     letterSpacing: 0.3,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: 'Inter-Medium',
+  },
+  retryButton: {
+    backgroundColor: '#ff8c00',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
   },
 });
