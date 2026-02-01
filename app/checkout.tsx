@@ -83,7 +83,50 @@ export default function CheckoutScreen() {
   useEffect(() => {
     fetchCartItems();
     fetchBankAccounts();
-  }, []);
+
+    // Listen for when user returns after payment
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && paymentMethod === 'paystack') {
+        // User came back to the tab, check if cart is empty (payment completed)
+        checkPaymentCompletion();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [paymentMethod]);
+
+  const checkPaymentCompletion = async () => {
+    if (!profile) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('carts')
+        .select('id')
+        .eq('user_id', profile.id);
+
+      if (error) throw error;
+
+      // If cart is empty, payment was completed
+      if (!data || data.length === 0) {
+        Alert.alert(
+          'Payment Successful',
+          'Your order has been placed successfully!',
+          [
+            {
+              text: 'View Orders',
+              onPress: () => router.replace('/(tabs)/orders'),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error checking payment completion:', error);
+    }
+  };
 
   const fetchCartItems = async () => {
     if (!profile) return;

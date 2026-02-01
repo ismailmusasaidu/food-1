@@ -168,12 +168,111 @@ Deno.serve(async (req: Request) => {
 
     if (deleteCartError) console.error('Failed to clear cart:', deleteCartError);
 
-    return new Response(null, {
-      status: 302,
-      headers: {
-        'Location': `/payment-success?reference=${reference}`,
-      },
-    });
+    return new Response(
+      `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payment Successful</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #ff8c00 0%, #ff6b00 100%);
+          }
+          .container {
+            background: white;
+            padding: 48px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+          }
+          .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: #dcfce7;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+          }
+          h1 {
+            color: #1f2937;
+            margin: 0 0 16px;
+            font-size: 28px;
+          }
+          p {
+            color: #6b7280;
+            margin: 0 0 24px;
+            font-size: 16px;
+            line-height: 1.5;
+          }
+          .order-number {
+            background: #f3f4f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+          }
+          .order-number strong {
+            color: #ff8c00;
+            font-size: 18px;
+          }
+          .button {
+            display: inline-block;
+            background: #ff8c00;
+            color: white;
+            padding: 16px 32px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: background 0.2s;
+          }
+          .button:hover {
+            background: #ff7700;
+          }
+          .message {
+            color: #059669;
+            font-size: 14px;
+            margin-top: 16px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="icon">✅</div>
+          <h1>Payment Successful!</h1>
+          <p>Your payment has been processed successfully and your order has been created.</p>
+          <div class="order-number">
+            <strong>Order #${orderData.order_number}</strong>
+          </div>
+          <a href="/payment-success?reference=${reference}&order=${orderData.order_number}" class="button">View Order Details</a>
+          <p class="message">You can close this window and return to the app to view your order.</p>
+        </div>
+        <script>
+          // Auto redirect after 3 seconds
+          setTimeout(() => {
+            window.location.href = '/payment-success?reference=${reference}&order=${orderData.order_number}';
+          }, 3000);
+        </script>
+      </body>
+      </html>
+      `,
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html',
+        },
+      }
+    );
   } catch (error) {
     console.error('Error:', error);
     return new Response(
