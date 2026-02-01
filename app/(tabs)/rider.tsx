@@ -621,6 +621,26 @@ export default function RiderDashboardScreen() {
     }
   };
 
+  const handleDismissNotification = async (notificationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) throw error;
+
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      setUnreadCount((prev) => {
+        const notification = notifications.find((n) => n.id === notificationId);
+        return notification && !notification.read ? Math.max(0, prev - 1) : prev;
+      });
+    } catch (error: any) {
+      console.error('Error dismissing notification:', error);
+      setErrorMessage('Failed to dismiss notification');
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchRiderData();
@@ -836,6 +856,7 @@ export default function RiderDashboardScreen() {
           <NotificationsList
             notifications={notifications}
             onMarkAsRead={handleMarkAsRead}
+            onDismiss={handleDismissNotification}
           />
         </View>
       </Modal>
