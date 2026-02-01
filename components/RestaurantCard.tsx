@@ -1,5 +1,16 @@
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Star, Clock, MapPin } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { Vendor } from '@/types/database';
 
 interface RestaurantCardProps {
@@ -8,10 +19,23 @@ interface RestaurantCardProps {
 }
 
 export default function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
+  const [fontsLoaded] = useFonts({
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
+
   const businessName = restaurant.business_name || 'Restaurant';
   const firstLetter = businessName.charAt(0).toUpperCase();
   const rating = Number(restaurant.rating) || 0;
   const minOrder = Number(restaurant.minimum_order) || 0;
+
+  if (!fontsLoaded) {
+    return null;
+  }
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
@@ -105,7 +129,7 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 64,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ffffff',
   },
   content: {
@@ -113,20 +137,21 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1f2937',
     marginBottom: 6,
   },
   description: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#64748b',
     lineHeight: 20,
     marginBottom: 10,
   },
   cuisineText: {
     fontSize: 13,
+    fontFamily: 'Poppins-SemiBold',
     color: '#ff8c00',
-    fontWeight: '600',
     marginBottom: 10,
   },
   metaContainer: {
@@ -141,12 +166,12 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
   },
   minOrder: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter-Medium',
     color: '#94a3b8',
     marginTop: 4,
   },
@@ -161,7 +186,7 @@ const styles = StyleSheet.create({
   },
   closedText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#dc2626',
   },
 });
