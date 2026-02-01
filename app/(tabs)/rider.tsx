@@ -61,6 +61,7 @@ export default function RiderDashboardScreen() {
   const [deliveryHistory, setDeliveryHistory] = useState<any[]>([]);
   const [historyFilter, setHistoryFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showHistory, setShowHistory] = useState(false);
+  const [showBatchHistory, setShowBatchHistory] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -982,6 +983,27 @@ export default function RiderDashboardScreen() {
                 );
               })
             )}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showBatchHistory}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowBatchHistory(false)}
+      >
+        <View style={[styles.modalContainer, { paddingTop: insets.top }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Batch Delivery History</Text>
+            <TouchableOpacity onPress={() => setShowBatchHistory(false)}>
+              <X size={24} color="#64748b" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.historyList}>
+            <Text style={styles.emptyMessage}>Batch delivery history coming soon</Text>
             <View style={styles.bottomSpacer} />
           </ScrollView>
         </View>
