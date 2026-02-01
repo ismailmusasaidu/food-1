@@ -343,11 +343,8 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#ff8c00',
-    marginHorizontal: 20,
     paddingHorizontal: 20,
     paddingBottom: 28,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
     shadowColor: '#ff8c00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
