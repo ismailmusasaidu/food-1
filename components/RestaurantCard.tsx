@@ -8,19 +8,24 @@ interface RestaurantCardProps {
 }
 
 export default function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
+  const businessName = restaurant.business_name || 'Restaurant';
+  const firstLetter = businessName.charAt(0).toUpperCase();
+  const rating = Number(restaurant.rating) || 0;
+  const minOrder = Number(restaurant.minimum_order) || 0;
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       {restaurant.logo_url ? (
         <Image source={{ uri: restaurant.logo_url }} style={styles.logo} />
       ) : (
         <View style={[styles.logo, styles.logoPlaceholder]}>
-          <Text style={styles.logoText}>{restaurant.business_name[0]}</Text>
+          <Text style={styles.logoText}>{firstLetter}</Text>
         </View>
       )}
 
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={1}>
-          {restaurant.business_name}
+          {businessName}
         </Text>
 
         {restaurant.description && (
@@ -38,7 +43,7 @@ export default function RestaurantCard({ restaurant, onPress }: RestaurantCardPr
         <View style={styles.metaContainer}>
           <View style={styles.metaItem}>
             <Star size={14} color="#fbbf24" fill="#fbbf24" />
-            <Text style={styles.metaText}>{restaurant.rating.toFixed(1)}</Text>
+            <Text style={styles.metaText}>{rating.toFixed(1)}</Text>
           </View>
 
           {restaurant.average_preparation_time && (
@@ -56,8 +61,8 @@ export default function RestaurantCard({ restaurant, onPress }: RestaurantCardPr
           )}
         </View>
 
-        {restaurant.minimum_order && restaurant.minimum_order > 0 && (
-          <Text style={styles.minOrder}>Min. order: ${restaurant.minimum_order.toFixed(2)}</Text>
+        {minOrder > 0 && (
+          <Text style={styles.minOrder}>Min. order: ${minOrder.toFixed(2)}</Text>
         )}
 
         {!restaurant.is_accepting_orders && (
