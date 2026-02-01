@@ -684,28 +684,6 @@ export default function RiderDashboardScreen() {
           />
         </View>
 
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#ff8c00',
-              padding: 12,
-              borderRadius: 8,
-              alignItems: 'center',
-            }}
-            onPress={async () => {
-              console.log('=== DEBUG BUTTON PRESSED ===');
-              console.log('Rider Profile:', JSON.stringify(riderProfile, null, 2));
-              console.log('Current Pending Assignments:', pendingAssignments.length);
-              console.log('Pending Assignments Data:', JSON.stringify(pendingAssignments, null, 2));
-              await fetchPendingAssignments();
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold' }}>
-              DEBUG: Refresh Assignments ({pendingAssignments.length})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {pendingAssignments.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
