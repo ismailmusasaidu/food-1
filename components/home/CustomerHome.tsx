@@ -12,6 +12,19 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Clock, Sun, Utensils, Moon } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { supabase } from '@/lib/supabase';
 import { Vendor, Category } from '@/types/database';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +40,17 @@ export default function CustomerHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedMealTime, setSelectedMealTime] = useState<string | null>(null);
+
+  const [fontsLoaded] = useFonts({
+    'Poppins-Regular': Poppins_400Regular,
+    'Poppins-Medium': Poppins_500Medium,
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
 
   useEffect(() => {
     fetchCategories();
@@ -281,6 +305,10 @@ export default function CustomerHome() {
     </>
   );
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -327,16 +355,16 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ffffff',
     marginBottom: 6,
     letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 15,
+    fontFamily: 'Inter-Medium',
     color: '#e0f2fe',
     marginBottom: 20,
-    fontWeight: '500',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -359,8 +387,8 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
     color: '#1e293b',
-    fontWeight: '600',
     borderWidth: 0,
     outlineWidth: 0,
   },
@@ -398,7 +426,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: 'Poppins-Bold',
     color: '#475569',
     letterSpacing: 0.3,
   },
@@ -435,15 +463,15 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     letterSpacing: 0.3,
   },
   sectionSubtitle: {
     fontSize: 14,
+    fontFamily: 'Inter-Medium',
     color: '#64748b',
     marginBottom: 16,
-    fontWeight: '500',
   },
   mealTimesContainer: {
     flexDirection: 'row',
@@ -481,7 +509,7 @@ const styles = StyleSheet.create({
   },
   mealTimeName: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     marginBottom: 4,
     letterSpacing: 0.5,
@@ -491,17 +519,17 @@ const styles = StyleSheet.create({
   },
   mealTimeInfo: {
     fontSize: 11,
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
     marginBottom: 2,
-    fontWeight: '600',
   },
   mealTimeInfoActive: {
     color: 'rgba(255, 255, 255, 0.9)',
   },
   mealTimeDelivery: {
     fontSize: 10,
+    fontFamily: 'Inter-Medium',
     color: '#94a3b8',
-    fontWeight: '500',
   },
   mealTimeDeliveryActive: {
     color: 'rgba(255, 255, 255, 0.8)',
@@ -512,7 +540,7 @@ const styles = StyleSheet.create({
   },
   restaurantsTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#1e293b',
     letterSpacing: 0.3,
   },
