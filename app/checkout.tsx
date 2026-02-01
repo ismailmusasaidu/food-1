@@ -434,6 +434,18 @@ export default function CheckoutScreen() {
             </View>
           </View>
 
+          {paymentMethod === 'bank_transfer' && (
+            <View style={styles.bankTransferReminder}>
+              <View style={styles.bankTransferReminderHeader}>
+                <Building2 size={20} color="#ff8c00" />
+                <Text style={styles.bankTransferReminderTitle}>Payment Reminder</Text>
+              </View>
+              <Text style={styles.bankTransferReminderText}>
+                Please include your Order ID <Text style={styles.orderIdHighlight}>#{orderNumber}</Text> in the transfer details/narration when making the bank transfer. This helps us verify your payment quickly.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.timelineCard}>
             <Text style={styles.timelineTitle}>What's Next?</Text>
 
@@ -833,7 +845,7 @@ export default function CheckoutScreen() {
               ))}
               <View style={styles.bankTransferNote}>
                 <Text style={styles.bankTransferNoteText}>
-                  Please transfer the exact amount and your order will be confirmed after payment verification.
+                  ⚠️ Important: After placing your order, you will receive an Order ID. Please include this Order ID in your transfer details/narration when making the payment. Transfer the exact amount and your order will be confirmed after payment verification.
                 </Text>
               </View>
             </View>
@@ -1579,8 +1591,38 @@ const styles = StyleSheet.create({
   },
   bankTransferNoteText: {
     fontSize: 13,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Medium',
     color: '#92400e',
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+  bankTransferReminder: {
+    backgroundColor: '#fff7ed',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#ff8c00',
+  },
+  bankTransferReminderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  bankTransferReminderTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ff8c00',
+  },
+  bankTransferReminderText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#64748b',
+    lineHeight: 20,
+  },
+  orderIdHighlight: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#ff8c00',
+    fontSize: 15,
   },
 });
