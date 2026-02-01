@@ -11,6 +11,7 @@ import {
   Linking,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Package, Truck, MapPin, CreditCard, ChevronLeft, CheckCircle, Clock, Calendar, Sun, Utensils, Moon, Wallet, Building2, DollarSign, Copy } from 'lucide-react-native';
 import { useFonts } from 'expo-font';
 import {
@@ -53,6 +54,7 @@ const DELIVERY_FEE = 5.0;
 
 export default function CheckoutScreen() {
   const { profile } = useAuth();
+  const insets = useSafeAreaInsets();
   const [cartItems, setCartItems] = useState<CartItemWithProduct[]>([]);
   const [deliveryType, setDeliveryType] = useState<'pickup' | 'delivery'>('pickup');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -522,7 +524,7 @@ export default function CheckoutScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 40) + 20 }]}>
         <TouchableOpacity style={styles.backButtonHeader} onPress={() => router.back()}>
           <ChevronLeft size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -912,7 +914,7 @@ export default function CheckoutScreen() {
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) }]}>
         <TouchableOpacity
           style={[styles.placeOrderButton, submitting && styles.buttonDisabled]}
           onPress={handlePlaceOrder}
@@ -972,7 +974,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#ff8c00',
-    paddingTop: 60,
     paddingBottom: 24,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 32,
@@ -1167,7 +1168,8 @@ const styles = StyleSheet.create({
   },
   footer: {
     backgroundColor: '#ffffff',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     borderTopWidth: 0,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
