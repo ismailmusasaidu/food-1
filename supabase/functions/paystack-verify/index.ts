@@ -168,86 +168,12 @@ Deno.serve(async (req: Request) => {
 
     if (deleteCartError) console.error('Failed to clear cart:', deleteCartError);
 
-    return new Response(
-      `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Payment Successful</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          }
-          .container {
-            background: white;
-            padding: 48px;
-            border-radius: 16px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 400px;
-          }
-          .icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 24px;
-            background: #d1fae5;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32px;
-          }
-          h1 {
-            color: #1f2937;
-            margin: 0 0 16px;
-          }
-          p {
-            color: #6b7280;
-            margin: 0 0 24px;
-          }
-          .amount {
-            font-size: 32px;
-            font-weight: bold;
-            color: #10b981;
-            margin: 16px 0;
-          }
-          .button {
-            display: inline-block;
-            background: #ff8c00;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="icon">✓</div>
-          <h1>Payment Successful!</h1>
-          <p>Your payment has been confirmed.</p>
-          <div class="amount">₦${(transaction.amount / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-          <p>Order Number: ${transaction.metadata?.order_number || 'N/A'}</p>
-          <a href="/" class="button">Return to App</a>
-        </div>
-      </body>
-      </html>
-      `,
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html',
-        },
-      }
-    );
+    return new Response(null, {
+      status: 302,
+      headers: {
+        'Location': `/payment-success?reference=${reference}`,
+      },
+    });
   } catch (error) {
     console.error('Error:', error);
     return new Response(
