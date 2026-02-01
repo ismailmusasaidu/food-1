@@ -32,6 +32,7 @@ interface BankAccountFormData {
 export default function BankAccountManagement() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState<BankAccountFormData>({
@@ -49,16 +50,24 @@ export default function BankAccountManagement() {
   const fetchBankAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
         .from('bank_accounts')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        setError(`Failed to load: ${fetchError.message}`);
+        return;
+      }
+
+      console.log('Bank accounts loaded:', data?.length || 0);
       setBankAccounts(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching bank accounts:', error);
-      Alert.alert('Error', 'Failed to load bank accounts');
+      setError(`Error: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -181,7 +190,7 @@ export default function BankAccountManagement() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Building2 size={24} color="#ff8c00" />
@@ -194,6 +203,15 @@ export default function BankAccountManagement() {
           </TouchableOpacity>
         )}
       </View>
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={fetchBankAccounts} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {showAddForm && (
         <View style={styles.formCard}>
@@ -411,17 +429,24 @@ export default function BankAccountManagement() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  scrollContent: {
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f9fafb',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   headerContent: {
     flexDirection: 'row',
@@ -452,6 +477,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
+    marginHorizontal: 16,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
@@ -541,6 +567,7 @@ const styles = StyleSheet.create({
   },
   accountsList: {
     gap: 12,
+    paddingHorizontal: 16,
   },
   accountCard: {
     backgroundColor: '#fff',
@@ -630,5 +657,30 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#94a3b8',
+  },
+  errorContainer: {
+    backgroundColor: '#fee2e2',
+    padding: 16,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  errorText: {
+    color: '#991b1b',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  retryButton: {
+    backgroundColor: '#ef4444',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

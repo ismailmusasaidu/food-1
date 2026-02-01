@@ -180,15 +180,13 @@ export default function AdminScreen() {
 
   if (showBankAccountManagement) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
+      <View style={styles.managementContainer}>
+        <View style={styles.managementHeader}>
           <TouchableOpacity onPress={() => setShowBankAccountManagement(false)} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.content}>
-          <BankAccountManagement />
-        </View>
+        <BankAccountManagement />
       </View>
     );
   }
@@ -462,5 +460,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#ffffff',
     fontWeight: '600',
+  },
+  managementContainer: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  managementHeader: {
+    backgroundColor: '#ff8c00',
+    padding: 20,
+    paddingTop: 60,
   },
 });
