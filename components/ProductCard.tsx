@@ -8,6 +8,17 @@ import {
   Dimensions,
 } from 'react-native';
 import { Star, ShoppingCart, Clock } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { Product, ProductImage } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 
@@ -22,6 +33,15 @@ export default function ProductCard({ product, onPress, onAddToCart }: ProductCa
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [fontsLoaded] = useFonts({
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
 
   useEffect(() => {
     fetchProductImages();
@@ -105,6 +125,10 @@ export default function ProductCard({ product, onPress, onAddToCart }: ProductCa
 
   if (!isValidUrl) {
     console.warn(`Invalid image URL for ${product.name}:`, currentImageUrl);
+  }
+
+  if (!fontsLoaded) {
+    return null;
   }
 
   return (
@@ -215,13 +239,13 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
     color: '#94a3b8',
-    fontWeight: '600',
   },
   placeholderSubtext: {
     fontSize: 11,
+    fontFamily: 'Inter-Medium',
     color: '#cbd5e1',
-    fontWeight: '500',
     marginTop: 4,
     textAlign: 'center',
   },
@@ -254,7 +278,7 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#1e293b',
     marginBottom: 6,
     height: 38,
@@ -276,9 +300,9 @@ const styles = StyleSheet.create({
   },
   rating: {
     fontSize: 13,
+    fontFamily: 'Poppins-Bold',
     color: '#92400e',
     marginLeft: 4,
-    fontWeight: '700',
   },
   prepTimeContainer: {
     flexDirection: 'row',
@@ -291,8 +315,8 @@ const styles = StyleSheet.create({
   },
   prepTime: {
     fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
     color: '#64748b',
-    fontWeight: '600',
   },
   productFooter: {
     flexDirection: 'row',
@@ -301,14 +325,14 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 20,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
     letterSpacing: 0.3,
   },
   unit: {
     fontSize: 12,
+    fontFamily: 'Inter-Medium',
     color: '#94a3b8',
-    fontWeight: '500',
     marginTop: 2,
   },
   addButton: {

@@ -14,6 +14,17 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import { X, Star, ShoppingCart, Plus, Minus, MapPin } from 'lucide-react-native';
+import { useFonts } from 'expo-font';
+import {
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_800ExtraBold,
+} from '@expo-google-fonts/poppins';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+} from '@expo-google-fonts/inter';
 import { Product } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,6 +67,15 @@ export default function ProductDetailModal({
   const [currentProduct, setCurrentProduct] = useState<Product | null>(product);
   const flatListRef = useRef<FlatList>(null);
   const autoPlayTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [fontsLoaded] = useFonts({
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold': Poppins_700Bold,
+    'Poppins-ExtraBold': Poppins_800ExtraBold,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+  });
 
   const fetchVendorInfo = async () => {
     if (!product) return;
@@ -237,7 +257,7 @@ export default function ProductDetailModal({
     };
   }, [visible, images.length]);
 
-  if (!currentProduct) return null;
+  if (!fontsLoaded || !currentProduct) return null;
 
   return (
     <Modal
@@ -505,7 +525,7 @@ const styles = StyleSheet.create({
   productName: {
     flex: 1,
     fontSize: 26,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#111827',
     lineHeight: 32,
   },
@@ -526,7 +546,7 @@ const styles = StyleSheet.create({
   },
   stockText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#047857',
   },
   ratingRow: {
@@ -545,11 +565,12 @@ const styles = StyleSheet.create({
   },
   rating: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#92400e',
   },
   reviewCount: {
     fontSize: 14,
+    fontFamily: 'Inter-Regular',
     color: '#6b7280',
   },
   priceSection: {
@@ -563,7 +584,7 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -575,13 +596,13 @@ const styles = StyleSheet.create({
   },
   price: {
     fontSize: 36,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
     letterSpacing: -1,
   },
   unit: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: 'Inter-Medium',
     color: '#6b7280',
   },
   section: {
@@ -589,7 +610,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#111827',
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -597,6 +618,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 15,
+    fontFamily: 'Inter-Regular',
     color: '#4b5563',
     lineHeight: 24,
   },
@@ -622,7 +644,7 @@ const styles = StyleSheet.create({
   },
   vendorAvatarText: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#ffffff',
   },
   vendorDetails: {
@@ -631,7 +653,7 @@ const styles = StyleSheet.create({
   },
   vendorName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#111827',
   },
   locationRow: {
@@ -641,6 +663,7 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 13,
+    fontFamily: 'Inter-Regular',
     color: '#6b7280',
   },
   vendorRatingBadge: {
@@ -654,7 +677,7 @@ const styles = StyleSheet.create({
   },
   vendorRatingText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#92400e',
   },
   quantityRow: {
@@ -695,7 +718,7 @@ const styles = StyleSheet.create({
   },
   quantity: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     color: '#111827',
   },
   subtotalContainer: {
@@ -704,14 +727,14 @@ const styles = StyleSheet.create({
   },
   subtotalLabel: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   subtotalAmount: {
     fontSize: 24,
-    fontWeight: '800',
+    fontFamily: 'Poppins-ExtraBold',
     color: '#ff8c00',
     letterSpacing: -0.5,
   },
@@ -751,7 +774,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#ffffff',
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
     letterSpacing: 0.5,
   },
 });
