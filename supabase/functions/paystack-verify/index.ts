@@ -217,7 +217,12 @@ Deno.serve(async (req: Request) => {
       throw orderError;
     }
 
-    console.log('Order created successfully:', newOrder.id);
+    console.log('Order created successfully:', {
+      order_id: newOrder.id,
+      order_number: newOrder.order_number,
+      payment_status: newOrder.payment_status,
+      customer_id: newOrder.customer_id
+    });
 
     console.log('Inserting order items...');
     const orderItemsWithOrderId = orderItems.map((item: any) => ({
@@ -234,7 +239,7 @@ Deno.serve(async (req: Request) => {
       throw itemsError;
     }
 
-    console.log('Order items inserted successfully');
+    console.log('Order items inserted successfully - Count:', orderItemsWithOrderId.length);
     console.log('Clearing cart for customer:', orderData.customer_id);
 
     const { error: deleteCartError } = await supabaseClient
@@ -245,8 +250,10 @@ Deno.serve(async (req: Request) => {
     if (deleteCartError) {
       console.error('Failed to clear cart:', deleteCartError);
     } else {
-      console.log('Cart cleared successfully');
+      console.log('Cart cleared successfully for user:', orderData.customer_id);
     }
+
+    console.log('=== Payment verification completed successfully ===');
 
     return new Response(
       `

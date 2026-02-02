@@ -138,26 +138,34 @@ export default function CheckoutScreen() {
     const checkPayment = async () => {
       try {
         pollCount++;
+        console.log('Polling attempt', pollCount, 'for reference:', paymentReference);
 
-        // Check if cart is empty (order was created and cart cleared)
-        const { data: cartData, error: cartError } = await supabase
-          .from('carts')
-          .select('id')
-          .eq('user_id', userId);
+        // First check if order exists by payment reference
+        const { data: orderByRef, error: orderRefError } = await supabase
+          .from('orders')
+          .select('id, payment_status, status, order_number')
+          .eq('payment_reference', paymentReference)
+          .maybeSingle();
 
-        console.log('Polling attempt', pollCount, 'Cart items:', cartData?.length);
+        console.log('Order by reference:', orderByRef, 'Error:', orderRefError);
 
-        // If cart is empty, payment succeeded
-        if (cartData && cartData.length === 0) {
+        if (orderByRef && orderByRef.payment_status === 'completed') {
           if (pollInterval) clearInterval(pollInterval);
           setSubmitting(false);
           setWaitingForPayment(false);
-          setOrderNumber(orderNum);
+
+          // Clear cart to ensure sync
+          await supabase
+            .from('carts')
+            .delete()
+            .eq('user_id', userId);
+
+          setOrderNumber(orderByRef.order_number);
           setOrderPlaced(true);
           return true;
         }
 
-        // Also try to find the order directly
+        // Fallback: check by order number
         const { data: order, error: orderError } = await supabase
           .from('orders')
           .select('id, payment_status, status, order_number')
@@ -165,7 +173,7 @@ export default function CheckoutScreen() {
           .eq('customer_id', userId)
           .maybeSingle();
 
-        console.log('Order check:', order, 'Error:', orderError);
+        console.log('Order by number:', order, 'Error:', orderError);
 
         if (order && order.payment_status === 'completed') {
           if (pollInterval) clearInterval(pollInterval);
@@ -181,7 +189,38 @@ export default function CheckoutScreen() {
           setOrderNumber(orderNum);
           setOrderPlaced(true);
           return true;
-        } else if (pollCount >= maxPolls) {
+        }
+
+        // Check if cart is empty (order was created and cart cleared)
+        const { data: cartData, error: cartError } = await supabase
+          .from('carts')
+          .select('id')
+          .eq('user_id', userId);
+
+        console.log('Cart items:', cartData?.length);
+
+        // If cart is empty, try one more time to find the order
+        if (cartData && cartData.length === 0) {
+          // Wait a moment for order to be fully created
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          const { data: finalOrder } = await supabase
+            .from('orders')
+            .select('id, order_number')
+            .eq('customer_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (pollInterval) clearInterval(pollInterval);
+          setSubmitting(false);
+          setWaitingForPayment(false);
+          setOrderNumber(finalOrder?.order_number || orderNum);
+          setOrderPlaced(true);
+          return true;
+        }
+
+        if (pollCount >= maxPolls) {
           if (pollInterval) clearInterval(pollInterval);
           setSubmitting(false);
           setWaitingForPayment(false);
@@ -208,6 +247,9 @@ export default function CheckoutScreen() {
         return false;
       }
     };
+
+    // Wait 3 seconds before starting to poll (give Paystack time to redirect)
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Check immediately first
     const immediateResult = await checkPayment();
@@ -745,26 +787,65 @@ export default function CheckoutScreen() {
             <ActivityIndicator size="large" color="#ff8c00" />
             <Text style={styles.waitingTitle}>Waiting for Payment</Text>
             <Text style={styles.waitingMessage}>
-              Please complete the payment in the Paystack window that opened.
+              Complete your payment and we'll automatically detect it.
             </Text>
             <Text style={styles.waitingSubMessage}>
-              After payment, we'll automatically detect it within a few seconds.
+              This usually takes a few seconds after payment completion.
             </Text>
             <View style={styles.waitingButtonsContainer}>
               <TouchableOpacity
                 style={styles.checkNowButton}
                 onPress={async () => {
                   // Manually trigger a check
-                  await fetchCartItems();
-                  const { data: cartData } = await supabase
-                    .from('carts')
-                    .select('id')
-                    .eq('user_id', profile?.id);
+                  try {
+                    // Check for order first
+                    const { data: recentOrder } = await supabase
+                      .from('orders')
+                      .select('id, order_number, payment_status')
+                      .eq('customer_id', profile?.id)
+                      .order('created_at', { ascending: false })
+                      .limit(1)
+                      .maybeSingle();
 
-                  if (cartData && cartData.length === 0) {
-                    setWaitingForPayment(false);
-                    setSubmitting(false);
-                    setOrderPlaced(true);
+                    console.log('Manual check - Recent order:', recentOrder);
+
+                    if (recentOrder && recentOrder.payment_status === 'completed') {
+                      // Clear cart
+                      await supabase
+                        .from('carts')
+                        .delete()
+                        .eq('user_id', profile?.id);
+
+                      setWaitingForPayment(false);
+                      setSubmitting(false);
+                      setOrderNumber(recentOrder.order_number);
+                      setOrderPlaced(true);
+                      return;
+                    }
+
+                    // Check if cart is empty
+                    const { data: cartData } = await supabase
+                      .from('carts')
+                      .select('id')
+                      .eq('user_id', profile?.id);
+
+                    console.log('Manual check - Cart items:', cartData?.length);
+
+                    if (cartData && cartData.length === 0 && recentOrder) {
+                      setWaitingForPayment(false);
+                      setSubmitting(false);
+                      setOrderNumber(recentOrder.order_number);
+                      setOrderPlaced(true);
+                    } else {
+                      Alert.alert(
+                        'Still Processing',
+                        'Payment verification is still in progress. Please wait a few more seconds.',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  } catch (error) {
+                    console.error('Manual check error:', error);
+                    Alert.alert('Error', 'Failed to check payment status. Please try again.');
                   }
                 }}
               >
@@ -773,11 +854,27 @@ export default function CheckoutScreen() {
               <TouchableOpacity
                 style={styles.cancelWaitingButton}
                 onPress={() => {
-                  setWaitingForPayment(false);
-                  setSubmitting(false);
+                  Alert.alert(
+                    'Cancel Waiting',
+                    'Are you sure? If you completed the payment, your order will still be created. You can check your orders later.',
+                    [
+                      {
+                        text: 'Keep Waiting',
+                        style: 'cancel',
+                      },
+                      {
+                        text: 'Go to Orders',
+                        onPress: () => {
+                          setWaitingForPayment(false);
+                          setSubmitting(false);
+                          router.replace('/(tabs)/orders');
+                        },
+                      },
+                    ]
+                  );
                 }}
               >
-                <Text style={styles.cancelWaitingButtonText}>Cancel & Return</Text>
+                <Text style={styles.cancelWaitingButtonText}>View My Orders</Text>
               </TouchableOpacity>
             </View>
           </View>
